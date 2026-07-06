@@ -101,11 +101,17 @@ tr.cluster td{background:#FDF6F5}
 .hint{font-size:.7rem;color:var(--sub);margin-top:2px}
 
 /* TREATMENT (v3) */
+.medcard{border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:8px;background:#FBFDFC}
 .medrow{display:flex;gap:6px;margin-bottom:6px;align-items:center}
-.medrow input{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-family:var(--sans);font-size:.8rem}
-.medrow .mName{flex:3;min-width:90px}.medrow .mDose{flex:1.2;min-width:52px}.medrow .mUnit{flex:1.2;min-width:58px}.medrow .mFreq{flex:2.4;min-width:80px}
+.medrow:last-child{margin-bottom:0}
+.medrow input{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-family:var(--sans);font-size:.8rem;min-width:0}
+.medrow .mName{flex:2.5}.medrow .mStr{flex:1.2}.medrow .mQty{flex:1.4}.medrow .mTimes{flex:3}
 .medrow select{border:1px solid var(--line);border-radius:8px;padding:6px 4px;font-family:var(--sans);font-size:.8rem}
 .medrow .rm{background:none;border:none;color:var(--red);font-size:1rem;cursor:pointer;padding:0 2px}
+.timerow{padding:7px 10px;border-bottom:1px solid var(--line);font-size:.84rem}
+.timerow:last-child{border-bottom:none}
+.timerow b{font-family:var(--mono);color:var(--teal);margin-right:6px}
+.viewtoggle{display:flex;gap:6px;margin-bottom:10px}
 .medchips{display:flex;flex-wrap:wrap;gap:4px}
 .medchip{background:var(--teal-soft);color:var(--teal);border-radius:8px;padding:3px 10px;font-size:.76rem}
 .ttag{display:inline-block;font-size:.68rem;padding:1px 8px;border-radius:99px;white-space:nowrap}
@@ -278,7 +284,12 @@ footer{font-size:.72rem;color:var(--sub);text-align:center;margin-top:8px;line-h
   <section id="curMedSec">
     <h2>การรักษาปัจจุบัน</h2>
     <div class="sub" id="curMedSub"></div>
-    <div class="medchips" id="curMedChips"></div>
+    <div class="viewtoggle screenonly" id="medViewToggle" style="display:none">
+      <button class="chip on" id="mvTime" onclick="setMedView('time')">ตามเวลาป้อนยา</button>
+      <button class="chip" id="mvDrug" onclick="setMedView('drug')">ตามตัวยา</button>
+    </div>
+    <div class="screenonly" id="curMedBody"></div>
+    <div class="printonly" id="curMedPrint"></div>
   </section>
 
   <section id="weightSec" style="display:none">
@@ -301,7 +312,7 @@ footer{font-size:.72rem;color:var(--sub);text-align:center;margin-top:8px;line-h
 <footer>
   ข้อมูลทั้งหมดเก็บในเครื่องนี้เท่านั้น — แนะนำกด "สำรองข้อมูล" เป็นระยะ เพราะการล้างข้อมูล browser จะลบบันทึกทั้งหมด<br>
   ⚠ เครื่องมือช่วยจดบันทึก ไม่ทดแทนคำวินิจฉัยของสัตวแพทย์ · ชักนาน ≥5 นาที หรือชักซ้ำหลายครั้งในวันเดียว ให้พบสัตวแพทย์ทันที<br>
-  Dog Seizure Tracker v3 · พัฒนาโดย ร้อยเอก ทวีพล รอดปรีชา ร่วมกับ Claude (Anthropic) · แจกฟรี ห้ามจำหน่าย (CC BY-NC 4.0)<br>
+  Dog Seizure Tracker v3.1 · พัฒนาโดย ร้อยเอก ทวีพล รอดปรีชา ร่วมกับ Claude (Anthropic) · แจกฟรี ห้ามจำหน่าย (CC BY-NC 4.0)<br>
   โค้ดเปิด + แจ้งปัญหาได้ที่ https://github.com/vfullcycle/dog-seizure-tracker
 </footer>
 </div><!-- /app -->
@@ -375,7 +386,7 @@ footer{font-size:.72rem;color:var(--sub);text-align:center;margin-top:8px;line-h
       <div id="medEditor" style="display:none;margin-top:8px">
         <div id="medRows"></div>
         <button class="btn sec sm" type="button" onclick="addMedRow()">＋ เพิ่มยา</button>
-        <div class="hint">ขนาด = ต่อการให้ 1 ครั้ง · เวลาให้ เช่น "07:00 / 19:00" หรือ "เช้า-เย็น พร้อมอาหาร"</div>
+        <div class="hint">ความแรง = ต่อ 1 เม็ด/หน่วย (เช่น 30 mg) · จำนวน/ครั้ง รับเศษส่วนได้ เช่น 1/3 · เวลาให้คั่นด้วย , เช่น 05.00, 16.30, 22.00</div>
       </div>
     </div>
     <div class="pactions">
@@ -396,7 +407,10 @@ const KEY="dogSeizureTracker.v2"; /* คง key เดิม — ข้อมู
 let memFallback=null;
 function normalizeDB(d){ /* migration v2 → v3: เพิ่ม treatments ให้ทุกตัว */
   d.version=3;
-  d.dogs.forEach(g=>{if(!Array.isArray(g.treatments))g.treatments=[]});
+  d.dogs.forEach(g=>{
+    if(!Array.isArray(g.treatments))g.treatments=[];
+    g.treatments.forEach(t=>{if(Array.isArray(t.meds))t.meds=t.meds.map(normMed)});
+  });
   return d;
 }
 function loadDB(){
@@ -601,10 +615,10 @@ function loadDemo(){
   ]};
   const tmk=(daysAgo,type,weight,advice,meds)=>({id:uid(),date:dayKey(new Date(now-daysAgo*864e5)),type,weight:weight||null,advice:advice||"",meds:meds||[]});
   demo.treatments=[
-    tmk(440,"vet",11.8,"เริ่มยากันชักหลังวินิจฉัย นัดติดตาม 3 เดือน",[{name:"Phenobarbital",dose:30,unit:"mg",freq:"07:00 / 19:00",how:""}]),
+    tmk(440,"vet",11.8,"เริ่มยากันชักหลังวินิจฉัย นัดติดตาม 3 เดือน",[{name:"Phenobarbital",strength:30,sunit:"mg",qtyText:"1",qty:1,qunit:"เม็ด",times:["07:00","19:00"],how:""}]),
     tmk(250,"weight",12.3),
     tmk(150,"blood",null,"ระดับยาในเลือดอยู่ในช่วงเป้าหมาย คงยาเดิม"),
-    tmk(35,"vet",12.6,"ชักถี่ขึ้นหลังมี cluster — เพิ่มขนาดยาเช้า และเพิ่มยาตัวที่สอง นัดเจาะเลือด 1 เดือน",[{name:"Phenobarbital",dose:45,unit:"mg",freq:"07:00 / 19:00",how:""},{name:"KBr",dose:250,unit:"mg",freq:"19:00 พร้อมอาหาร",how:""}])
+    tmk(35,"vet",12.6,"ชักถี่ขึ้นหลังมี cluster — เพิ่มยาเช้าเป็นเม็ดครึ่ง และเพิ่มยาตัวที่สอง นัดเจาะเลือด 1 เดือน",[{name:"Phenobarbital",strength:30,sunit:"mg",qtyText:"1 1/2",qty:1.5,qunit:"เม็ด",times:["07:00","19:00"],how:""},{name:"KBr",strength:250,sunit:"mg",qtyText:"1",qty:1,qunit:"เม็ด",times:["19:00"],how:""}])
   ];
   DB.dogs.push(demo);DB.activeDogId=demo.id;saveDB();boot();
   toast("โหลดข้อมูลสมมติแล้ว — ลบได้ที่ 'แก้ไขโปรไฟล์'");
@@ -617,6 +631,46 @@ function obCreate(){
 }
 
 /* ================= TREATMENT (v3) ================= */
+/* ---------- โครงยาใหม่ (v3.1): แยก ความแรง / จำนวนต่อครั้ง / เวลาให้ ---------- */
+function parseQty(t){ /* รับ "1/3", "1 1/2", "0.7" → ตัวเลข */
+  t=(t||"").trim();if(!t)return null;
+  let m=t.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/);if(m)return +m[1]+ +m[2]/+m[3];
+  m=t.match(/^(\d+)\s*\/\s*(\d+)$/);if(m&&+m[2]!==0)return +m[1]/+m[2];
+  const v=parseFloat(t);return isNaN(v)?null:v;
+}
+const parseTimes=s=>(s||"").split(/[,\/]/).map(x=>x.trim().replace(".",":")).filter(Boolean);
+function normMed(m){ /* migrate ยาโครงเก่า {dose,unit,freq} → โครงใหม่ แบบอนุรักษ์ ไม่เดาข้อมูล */
+  if(m.times!==undefined)return m;
+  return {name:m.name,strength:null,sunit:"mg",
+    qtyText:m.dose!=null?String(m.dose):"",qty:m.dose??null,qunit:m.unit||"เม็ด",
+    times:parseTimes(m.freq),how:m.how||""};
+}
+const timeKey=t=>{const m=(t||"").match(/^(\d{1,2})[:.](\d{2})$/);return m?+m[1]*60+ +m[2]:9999};
+const fmtQty=m=>`${m.qtyText||m.qty||"?"} ${m.qunit}`;
+const fmtMed=m=>`${m.name}${m.strength?` ${m.strength} ${m.sunit}`:""} · ${fmtQty(m)}${m.times&&m.times.length?` · ${m.times.join(", ")}`:""}`;
+function medViewsHTML(meds,weightKg){
+  /* มุมมองตามเวลา: จัดกลุ่มตามช่วงป้อนยา */
+  const groups={};
+  meds.forEach(m=>{(m.times&&m.times.length?m.times:["ไม่ระบุเวลา"]).forEach(t=>{(groups[t]??=[]).push(m)})});
+  const timeHTML=Object.keys(groups).sort((a,b)=>timeKey(a)-timeKey(b)).map(t=>
+    `<div class="timerow"><b>${esc(t)}</b>${groups[t].map(m=>esc(`${m.name} ${fmtQty(m)}`)).join(" · ")}</div>`).join("");
+  /* มุมมองตามตัวยา: รวมปริมาณ/วัน + mg/kg/วัน */
+  const drugHTML=meds.map(m=>{
+    const n=m.times?.length||0;
+    const perDay=m.strength&&m.qty&&n?m.strength*m.qty*n:null;
+    const mgkg=perDay&&weightKg?` ≈ ${(perDay/weightKg).toFixed(1)} ${m.sunit}/kg/วัน`:"";
+    return `<div class="timerow"><b>${esc(m.name)}</b>${m.strength?`${m.strength} ${m.sunit} · `:""}${esc(fmtQty(m))} × ${n} ครั้ง/วัน${perDay?` = ${+perDay.toFixed(2)} ${m.sunit}/วัน${esc(mgkg)}`:""}</div>`;
+  }).join("");
+  return {timeHTML,drugHTML};
+}
+let medView="time";
+function setMedView(v){
+  medView=v;
+  document.getElementById("mvTime").classList.toggle("on",v==="time");
+  document.getElementById("mvDrug").classList.toggle("on",v==="drug");
+  const dog=activeDog();if(dog)renderTreatments(dog);
+}
+
 const TTYPE={vet:"พบสัตวแพทย์",med:"ปรับยา",weight:"ชั่งน้ำหนัก",blood:"ตรวจเลือด"};
 let editingTreatId=null;
 const treatSorted=d=>[...(d.treatments||[])].sort((a,b)=>a.date.localeCompare(b.date));
@@ -628,26 +682,34 @@ function latestWeight(d){
   const t=treatSorted(d).filter(t=>t.weight>0);
   return t.length?t[t.length-1]:null;
 }
-const fmtMed=m=>`${m.name} ${m.dose||""}${m.dose?" "+m.unit:""}${m.freq?" · "+m.freq:""}${m.how?" ("+m.how+")":""}`;
-function medRowHTML(m={name:"",dose:"",unit:"mg",freq:"",how:""}){
-  const u=["mg","เม็ด","แคปซูล","ml"].map(x=>`<option ${m.unit===x?"selected":""}>${x}</option>`).join("");
-  return `<div class="medrow">
-    <input class="mName" placeholder="ชื่อยา" value="${esc(m.name)}">
-    <input class="mDose" type="number" min="0" step="0.05" placeholder="ขนาด" value="${m.dose??""}">
-    <select class="mUnit">${u}</select>
-    <input class="mFreq" placeholder="เวลาให้" value="${esc(m.freq)}">
-    <button class="rm" type="button" onclick="this.parentElement.remove()">✕</button>
+function medRowHTML(m){
+  m=normMed(m||{name:"",dose:"",unit:"เม็ด",freq:""});
+  const su=["mg","mcg","g"].map(x=>`<option ${m.sunit===x?"selected":""}>${x}</option>`).join("");
+  const qu=["เม็ด","ml","แคปซูล","หยด"].map(x=>`<option ${m.qunit===x?"selected":""}>${x}</option>`).join("");
+  return `<div class="medcard">
+    <div class="medrow">
+      <input class="mName" placeholder="ชื่อยา" value="${esc(m.name)}">
+      <input class="mStr" type="number" step="any" min="0" placeholder="ความแรง/เม็ด" value="${m.strength??""}">
+      <select class="mStrU">${su}</select>
+      <button class="rm" type="button" onclick="this.closest('.medcard').remove()">✕</button>
+    </div>
+    <div class="medrow">
+      <input class="mQty" placeholder="จำนวน/ครั้ง เช่น 1/3" value="${esc(m.qtyText)}">
+      <select class="mUnit">${qu}</select>
+      <input class="mTimes" placeholder="เวลาให้ เช่น 05.00, 16.30" value="${esc((m.times||[]).join(", "))}">
+    </div>
   </div>`;
 }
 function addMedRow(m){document.getElementById("medRows").insertAdjacentHTML("beforeend",medRowHTML(m))}
 function readMedRows(){
-  return [...document.querySelectorAll("#medRows .medrow")].map(r=>({
-    name:r.querySelector(".mName").value.trim(),
-    dose:parseFloat(r.querySelector(".mDose").value)||null,
-    unit:r.querySelector(".mUnit").value,
-    freq:r.querySelector(".mFreq").value.trim(),
-    how:""
-  })).filter(m=>m.name);
+  return [...document.querySelectorAll("#medRows .medcard")].map(c=>{
+    const g=s=>c.querySelector(s);
+    const qtyText=g(".mQty").value.trim();
+    return {name:g(".mName").value.trim(),
+      strength:parseFloat(g(".mStr").value)||null,sunit:g(".mStrU").value,
+      qtyText,qty:parseQty(qtyText),qunit:g(".mUnit").value,
+      times:parseTimes(g(".mTimes").value),how:""};
+  }).filter(m=>m.name);
 }
 function openTreatModal(t){
   editingTreatId=t?t.id:null;
@@ -726,17 +788,19 @@ function renderTreatments(dog){
   const ts=treatSorted(dog);
   /* การรักษาปัจจุบัน */
   const lm=latestMeds(dog),lw=latestWeight(dog);
-  const chips=document.getElementById("curMedChips");
+  const body=document.getElementById("curMedBody");
+  const prn=document.getElementById("curMedPrint");
   const sub=document.getElementById("curMedSub");
+  const tog=document.getElementById("medViewToggle");
   if(lm){
     sub.textContent=`ชุดยาตามบันทึกวันที่ ${fmtDate(new Date(lm.date+"T12:00"))}`+(lw?` · น้ำหนักล่าสุด ${lw.weight} กก. (${fmtDate(new Date(lw.date+"T12:00"))})`:"");
-    chips.innerHTML=lm.meds.map(m=>{
-      const mgkg=m.unit==="mg"&&m.dose&&lw?` ≈ ${(m.dose/lw.weight).toFixed(1)} mg/kg/ครั้ง`:"";
-      return `<span class="medchip">${esc(fmtMed(m))}${mgkg}</span>`;
-    }).join("");
+    const v=medViewsHTML(lm.meds,lw?lw.weight:null);
+    tog.style.display="";
+    body.innerHTML=medView==="time"?v.timeHTML:v.drugHTML;
+    prn.innerHTML=`<div class="sub">ตารางเวลาป้อนยา</div>${v.timeHTML}<div class="sub" style="margin-top:10px">สรุปตามตัวยา (ปริมาณ/วัน)</div>${v.drugHTML}`;
   }else{
     sub.textContent=dog.meds?`จากโปรไฟล์: ${dog.meds} — กด "＋ การรักษา/น้ำหนัก" เพื่อบันทึกชุดยาแบบละเอียด`:'ยังไม่มีบันทึก — กด "＋ การรักษา/น้ำหนัก" เพื่อเริ่มบันทึกยา น้ำหนัก และการพบหมอ';
-    chips.innerHTML="";
+    tog.style.display="none";body.innerHTML="";prn.innerHTML="";
   }
   /* ตารางประวัติ (ตาม filter ร่วม) + ฉบับ print (เต็มเสมอ) */
   const inF=t=>{const d=new Date(t.date+"T12:00");return (!F.from||d>=F.from)&&(!F.to||d<=F.to)};
@@ -786,7 +850,7 @@ function render(){
 
   /* hero = สถานะปัจจุบัน ไม่ขึ้นกับ filter */
   const lmHero=latestMeds(dog);
-  const medsLine=lmHero?lmHero.meds.map(m=>m.name+(m.dose?` ${m.dose} ${m.unit}`:"")).join(", "):dog.meds;
+  const medsLine=lmHero?lmHero.meds.map(m=>`${m.name} ${m.qtyText||m.qty||""} ${m.qunit}`.trim()).join(", "):dog.meds;
   document.getElementById("freeDays").textContent=Math.floor((now-lastAll)/864e5);
   document.getElementById("heroSince").textContent=`ชักครั้งล่าสุด: ${fmtDT(lastAll)}${medsLine?` · ยา: ${medsLine}`:""}`;
 
