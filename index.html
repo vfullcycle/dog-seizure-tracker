@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dog Seizure Tracker — บันทึกอาการชักสุนัข</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --paper:#F4F7F6; --card:#FFFFFF; --ink:#16302B; --sub:#5C7570;
+  --teal:#0E7C7B; --teal-soft:#E0F0EF; --amber:#D98E04; --amber-soft:#FBF1DC;
+  --red:#C4453C; --red-soft:#F9E6E4; --line:#DDE7E5;
+  --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans Thai',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;padding:20px 16px 48px}
+.wrap{max-width:1080px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+h1{font-size:1.35rem;font-weight:700}
+h1 .paw{color:var(--teal)}
+.dogbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.dogbar select{border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-family:var(--sans);font-size:.86rem;background:#fff;color:var(--ink)}
+button{font-family:var(--sans);cursor:pointer}
+.btn{border:none;border-radius:8px;padding:8px 16px;font-size:.84rem;font-weight:500}
+a.btn{text-decoration:none;display:inline-block}
+.btn.pri{background:var(--teal);color:#fff}
+.btn.sec{background:#fff;border:1px solid var(--line);color:var(--sub)}
+.btn.danger{background:var(--red-soft);border:1px solid #E8BDB9;color:var(--red)}
+.btn.sm{padding:4px 10px;font-size:.76rem}
+
+/* HERO */
+.hero{background:linear-gradient(135deg,#0E7C7B,#0A5C5B);color:#fff;border-radius:16px;padding:26px 26px 18px;margin-bottom:16px}
+.hero .label{font-size:.85rem;opacity:.85;letter-spacing:.04em}
+.hero .big{font-family:var(--mono);font-size:3.4rem;font-weight:600;line-height:1.1}
+.hero .big small{font-family:var(--sans);font-size:1.1rem;font-weight:500;opacity:.9}
+.hero .since{font-size:.82rem;opacity:.8;margin-top:2px}
+.strip{margin-top:18px}
+.strip svg{width:100%;height:52px;display:block}
+.strip .cap{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.68rem;opacity:.75;margin-top:2px}
+
+/* KPI + INSIGHT */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpi .v{font-family:var(--mono);font-size:1.5rem;font-weight:600;color:var(--teal)}
+.kpi .v.warn{color:var(--amber)} .kpi .v.bad{color:var(--red)}
+.kpi .k{font-size:.78rem;color:var(--sub);margin-top:2px}
+.kpi .n{font-size:.68rem;color:var(--sub);opacity:.75}
+.insights{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:16px}
+.insight{border-radius:12px;padding:12px 14px;font-size:.84rem;border:1px solid var(--line);background:var(--card)}
+.insight.amber{background:var(--amber-soft);border-color:#EAD3A0}
+.insight.red{background:var(--red-soft);border-color:#E8BDB9}
+.insight.teal{background:var(--teal-soft);border-color:#BEDCDA}
+.insight b{display:block;margin-bottom:2px}
+
+/* TOOLBAR */
+.toolbar{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+#tbMsg{font-size:.76rem;font-weight:600}
+.filterbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-left:auto}
+.chip{border:1px solid var(--line);background:#fff;color:var(--sub);border-radius:99px;padding:4px 12px;font-size:.76rem;cursor:pointer;font-family:var(--sans)}
+.chip.on{background:var(--teal-soft);border-color:var(--teal);color:var(--teal);font-weight:600}
+.filterbar input[type=date]{border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-family:var(--sans);font-size:.76rem;color:var(--ink)}
+
+/* SECTIONS */
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:16px}
+section h2{font-size:1rem;font-weight:600;margin-bottom:2px}
+section .sub{font-size:.78rem;color:var(--sub);margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+.chartbox{position:relative;height:260px}
+.chartbox.tall{height:300px}
+.scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+/* TABLE */
+.tblwrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+th{text-align:left;font-weight:600;color:var(--sub);font-size:.74rem;letter-spacing:.03em;padding:8px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+td.mono{font-family:var(--mono);font-size:.76rem;white-space:nowrap}
+tr.cluster td{background:#FDF6F5}
+.tag{display:inline-block;font-size:.68rem;padding:1px 8px;border-radius:99px;background:var(--teal-soft);color:var(--teal);white-space:nowrap}
+.tag.red{background:var(--red-soft);color:var(--red)}
+.tag.amber{background:var(--amber-soft);color:var(--amber)}
+.dim{color:var(--sub);opacity:.6}
+.rowbtn{background:none;border:none;color:var(--teal);font-size:.74rem;cursor:pointer;padding:1px 4px}
+.rowbtn.del{color:var(--red)}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(22,48,43,.45);display:none;align-items:flex-start;justify-content:center;padding:24px 12px;z-index:50;overflow-y:auto}
+.overlay.open{display:flex}
+.panel{background:#fff;border-radius:14px;padding:20px;width:100%;max-width:480px;margin-top:4vh}
+.panel h3{font-size:1rem;margin-bottom:12px}
+.frow{margin-bottom:10px}
+.frow label{display:block;font-size:.76rem;color:var(--sub);margin-bottom:3px;font-weight:500}
+.frow input,.frow select,.frow textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--sans);font-size:.86rem;color:var(--ink)}
+.frow textarea{height:60px;resize:vertical}
+.frow .duo{display:flex;gap:8px}
+.frow .duo input{flex:2}.frow .duo select{flex:1}
+.frow .duo2{display:flex;gap:8px}.frow .duo2>div{flex:1}
+.pactions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+.hint{font-size:.7rem;color:var(--sub);margin-top:2px}
+
+/* TREATMENT (v3) */
+.medrow{display:flex;gap:6px;margin-bottom:6px;align-items:center}
+.medrow input{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-family:var(--sans);font-size:.8rem}
+.medrow .mName{flex:3;min-width:90px}.medrow .mDose{flex:1.2;min-width:52px}.medrow .mUnit{flex:1.2;min-width:58px}.medrow .mFreq{flex:2.4;min-width:80px}
+.medrow select{border:1px solid var(--line);border-radius:8px;padding:6px 4px;font-family:var(--sans);font-size:.8rem}
+.medrow .rm{background:none;border:none;color:var(--red);font-size:1rem;cursor:pointer;padding:0 2px}
+.medchips{display:flex;flex-wrap:wrap;gap:4px}
+.medchip{background:var(--teal-soft);color:var(--teal);border-radius:8px;padding:3px 10px;font-size:.76rem}
+.ttag{display:inline-block;font-size:.68rem;padding:1px 8px;border-radius:99px;white-space:nowrap}
+.ttag.vet{background:var(--teal-soft);color:var(--teal)}
+.ttag.med{background:var(--amber-soft);color:var(--amber)}
+.ttag.weight{background:#EEF1F0;color:var(--sub)}
+.ttag.blood{background:var(--red-soft);color:var(--red)}
+.printonly{display:none}
+
+/* ONBOARDING */
+#onboard .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px;max-width:560px;margin:4vh auto}
+#onboard h2{font-size:1.2rem;margin-bottom:6px}
+#onboard p{font-size:.86rem;color:var(--sub);margin-bottom:14px}
+.disclaimer{background:var(--amber-soft);border:1px solid #EAD3A0;border-radius:10px;padding:10px 12px;font-size:.76rem;margin:14px 0}
+footer{font-size:.72rem;color:var(--sub);text-align:center;margin-top:8px;line-height:1.7}
+
+/* MOBILE */
+@media(max-width:600px){
+  body{padding:12px 10px 40px;font-size:14px}
+  header{flex-direction:column;align-items:flex-start;gap:6px;margin-bottom:14px}
+  h1{font-size:1.15rem}
+  .hero{padding:20px 16px 14px;border-radius:14px}
+  .hero .big{font-size:2.5rem}
+  .strip svg{height:44px}
+  .kpis{grid-template-columns:1fr 1fr;gap:8px}
+  .kpi{padding:11px 12px}
+  .kpi .v{font-size:1.25rem}
+  section{padding:14px;border-radius:12px}
+  .chartbox{height:215px}
+  .chartbox.tall{height:235px}
+  .toolbar{padding:10px 12px}
+  .toolbar .btn.pri{width:100%}
+  .filterbar{width:100%;margin-left:0}
+  .filterbar input[type=date]{flex:1;min-width:118px}
+  table{font-size:.76rem}
+  th,td{padding:6px 7px}
+}
+
+/* PRINT: ซ่อนส่วนควบคุม เหลือเฉพาะเนื้อหาสำหรับหมอ */
+@media print{
+  body{background:#fff;padding:0}
+  .toolbar,.dogbar button,.rowbtn,details,.overlay,.screenonly{display:none!important}
+  .printonly{display:block!important}
+  section,.kpi,.insight{border:1px solid #ccc;break-inside:avoid}
+  .hero{background:#0E7C7B!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ONBOARDING (แสดงเมื่อยังไม่มีโปรไฟล์) -->
+<div id="onboard" style="display:none">
+  <div class="card">
+    <h2><span style="color:var(--teal)">●</span> Dog Seizure Tracker</h2>
+    <p>เครื่องมือบันทึกและวิเคราะห์อาการชักของสุนัข สำหรับติดตามแนวโน้มและใช้ประกอบการปรึกษาสัตวแพทย์ — ข้อมูลทั้งหมดเก็บในเครื่องของคุณเท่านั้น ไม่มีการส่งขึ้นอินเทอร์เน็ต</p>
+    <div class="frow"><label>ชื่อสุนัข *</label><input id="obName" placeholder="เช่น ไข่หวาน"></div>
+    <div class="frow"><label>พันธุ์ (ไม่บังคับ)</label><input id="obBreed" placeholder="เช่น Jack Russell Terrier"></div>
+    <div class="frow"><label>ยาที่ได้รับ / เวลาให้ยา (ไม่บังคับ)</label><input id="obMeds" placeholder="เช่น Phenobarbital เช้า-เย็น 07:00 / 19:00"></div>
+    <div class="pactions">
+      <button class="btn sec" onclick="loadDemo()">ดูตัวอย่างด้วยข้อมูลสมมติ</button>
+      <button class="btn pri" onclick="obCreate()">เริ่มใช้งาน</button>
+    </div>
+    <div class="disclaimer">⚠ เครื่องมือนี้ช่วยจดบันทึกและสรุปข้อมูลเท่านั้น ไม่ใช่เครื่องมือวินิจฉัยและไม่ทดแทนคำแนะนำของสัตวแพทย์ หากสุนัขชักนานเกิน 5 นาที หรือชักซ้ำหลายครั้งในวันเดียว ให้พาไปพบสัตวแพทย์ทันที</div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none">
+<header>
+  <h1><span class="paw">●</span> <span id="dogTitle"></span> — บันทึกอาการชัก</h1>
+  <div class="dogbar">
+    <select id="dogSelect" onchange="switchDog(this.value)"></select>
+    <button class="btn sec sm" onclick="openDogModal(false)">＋ เพิ่มสุนัข</button>
+    <button class="btn sec sm" onclick="openDogModal(true)">แก้ไขโปรไฟล์</button>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="label">ปลอดอาการชักมาแล้ว</div>
+  <div class="big"><span id="freeDays">–</span> <small>วัน</small></div>
+  <div class="since" id="heroSince"></div>
+  <div class="strip">
+    <svg id="stripSvg" preserveAspectRatio="none"></svg>
+    <div class="cap"><span id="stripStart"></span><span>ทุกขีด = ชัก 1 ครั้ง · สีแดง = วันที่ชักซ้ำ</span><span id="stripEnd"></span></div>
+  </div>
+</div>
+
+<div class="kpis" id="kpiRow"></div>
+<div class="insights" id="insightRow"></div>
+
+<div class="toolbar">
+  <button class="btn pri" onclick="openRecModal()">＋ บันทึกการชัก</button>
+  <button class="btn sec sm" onclick="openTreatModal()">＋ การรักษา/น้ำหนัก</button>
+  <button class="btn sec sm" onclick="exportJSON()">สำรองข้อมูล</button>
+  <button class="btn sec sm" onclick="document.getElementById('importFile').click()">นำเข้า</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
+  <button class="btn sec sm" onclick="exportCSV()">CSV</button>
+  <button class="btn sec sm" onclick="window.print()">พิมพ์สรุป</button>
+  <a class="btn sec sm" href="https://github.com/vfullcycle/dog-seizure-tracker/issues" target="_blank" rel="noopener">รายงานปัญหา / ข้อเสนอแนะ</a>
+  <span id="tbMsg"></span>
+  <div class="filterbar">
+    <button class="chip on" onclick="setPreset('all',this)">ทั้งหมด</button>
+    <button class="chip" onclick="setPreset('ytd',this)">ปีนี้</button>
+    <button class="chip" onclick="setPreset(365,this)">12 เดือน</button>
+    <button class="chip" onclick="setPreset(90,this)">90 วัน</button>
+    <input type="date" id="fFrom" onchange="setCustomRange()">
+    <span style="color:var(--sub);font-size:.76rem">ถึง</span>
+    <input type="date" id="fTo" onchange="setCustomRange()">
+  </div>
+</div>
+
+<div id="chartsArea">
+<section>
+  <h2>แนวโน้มความถี่ <span class="dim" id="scopeNote" style="font-size:.74rem;font-weight:400"></span></h2>
+  <div class="sub">จำนวนครั้งต่อเดือน — ใช้ประเมินว่ายาคุมอาการได้ดีขึ้นหรือแย่ลง (จอแคบเลื่อนกราฟซ้าย–ขวาได้)</div>
+  <div class="scrollx"><div class="chartbox tall" id="monthlyBox"><canvas id="chMonthly"></canvas></div></div>
+</section>
+
+<div class="grid2">
+  <section>
+    <h2>ช่วงเวลาที่ชัก</h2>
+    <div class="sub">ชักกลางคืน/เช้ามืดบ่อย มักสัมพันธ์กับระดับยาในเลือดต่ำ — ปรึกษาหมอเรื่องเวลาให้ยา</div>
+    <div class="chartbox"><canvas id="chTime"></canvas></div>
+  </section>
+  <section>
+    <h2>ระยะเวลาชักแต่ละครั้ง</h2>
+    <div class="sub">ถ้าสัดส่วนการชักนานเพิ่มขึ้น ควรแจ้งสัตวแพทย์</div>
+    <div class="chartbox"><canvas id="chDur"></canvas></div>
+  </section>
+</div>
+
+<div class="grid2">
+  <section>
+    <h2>ระยะห่างระหว่างการชัก</h2>
+    <div class="sub">จำนวนวันนับจากครั้งก่อนหน้า (log scale) — เส้นยิ่งต่ำ = ชักถี่ขึ้น</div>
+    <div class="chartbox"><canvas id="chGap"></canvas></div>
+  </section>
+  <section>
+    <h2>เวลาชัก vs เวลาฟื้นตัว</h2>
+    <div class="sub">จุดยิ่งขวาบน = ชักนานและฟื้นช้า (แสดงเฉพาะครั้งที่บันทึกเวลาฟื้นตัว)</div>
+    <div class="chartbox"><canvas id="chScatter"></canvas></div>
+  </section>
+</div>
+
+<section>
+  <h2>วันที่มีการชักซ้ำ (Cluster Days)</h2>
+  <div class="sub">ชัก ≥2 ครั้งใน 1 วัน — ภาวะชักต่อเนื่องอันตราย ควรเฝ้าระวังเป็นพิเศษ</div>
+  <div class="tblwrap"><table id="tblCluster"><thead><tr><th>วันที่</th><th>จำนวนครั้ง</th><th>เวลา</th><th>ห่างกัน</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section>
+  <h2>ประวัติละเอียด</h2>
+  <div class="sub">เรียงจากล่าสุด — แถวพื้นชมพู = อยู่ในวัน cluster</div>
+  <div class="tblwrap"><table id="tblDetail"><thead><tr><th>#</th><th>วัน–เวลา</th><th>ชักนาน</th><th>ฟื้นตัว</th><th>Trigger</th><th>ลักษณะ</th><th>หมายเหตุ</th><th></th></tr></thead><tbody></tbody></table></div>
+</section>
+</div>
+
+<div id="emptyState" style="display:none">
+  <section style="text-align:center;padding:40px 20px">
+    <div style="font-size:2rem;margin-bottom:8px">📋</div>
+    <div style="font-weight:600;margin-bottom:4px">ยังไม่มีบันทึกของ <span id="emptyDogName"></span></div>
+    <div class="sub" style="margin-bottom:14px">กดปุ่มด้านล่างเพื่อบันทึกครั้งแรก — ยิ่งบันทึกสม่ำเสมอ กราฟยิ่งช่วยหมอวิเคราะห์ได้แม่น</div>
+    <button class="btn pri" onclick="openRecModal()">＋ บันทึกการชัก</button>
+  </section>
+</div>
+
+<!-- TREATMENT AREA (v3) — อิสระจากบันทึกการชัก -->
+<div id="treatArea">
+  <section id="curMedSec">
+    <h2>การรักษาปัจจุบัน</h2>
+    <div class="sub" id="curMedSub"></div>
+    <div class="medchips" id="curMedChips"></div>
+  </section>
+
+  <section id="weightSec" style="display:none">
+    <h2>น้ำหนักตัว</h2>
+    <div class="sub">น้ำหนักเปลี่ยน = ขนาดยาต่อกิโลกรัมเปลี่ยนตาม — ข้อมูลสำคัญเวลาหมอทบทวนขนาดยา</div>
+    <div class="chartbox"><canvas id="chWeight"></canvas></div>
+  </section>
+
+  <section>
+    <h2>ประวัติการรักษา <span class="dim screenonly" id="treatScope" style="font-size:.74rem;font-weight:400"></span></h2>
+    <div class="sub screenonly">พบสัตวแพทย์ · ปรับยา · ชั่งน้ำหนัก · ตรวจเลือด — เส้นประบนกราฟแนวโน้มคือเหตุการณ์เหล่านี้</div>
+    <div class="tblwrap screenonly"><table id="tblTreat"><thead><tr><th>วันที่</th><th>ประเภท</th><th>น้ำหนัก</th><th>ชุดยา ณ วันนั้น</th><th>คำแนะนำหมอ / บันทึก</th><th></th></tr></thead><tbody></tbody></table></div>
+    <div class="printonly">
+      <div class="sub">ประวัติการรักษาและการปรับยาทั้งหมด (แสดงเต็มเสมอ ไม่ตัดตามช่วงวันที่)</div>
+      <div class="tblwrap"><table id="tblTreatPrint"><thead><tr><th>วันที่</th><th>ประเภท</th><th>น้ำหนัก</th><th>ชุดยา ณ วันนั้น</th><th>คำแนะนำหมอ / บันทึก</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+</div>
+
+<footer>
+  ข้อมูลทั้งหมดเก็บในเครื่องนี้เท่านั้น — แนะนำกด "สำรองข้อมูล" เป็นระยะ เพราะการล้างข้อมูล browser จะลบบันทึกทั้งหมด<br>
+  ⚠ เครื่องมือช่วยจดบันทึก ไม่ทดแทนคำวินิจฉัยของสัตวแพทย์ · ชักนาน ≥5 นาที หรือชักซ้ำหลายครั้งในวันเดียว ให้พบสัตวแพทย์ทันที<br>
+  Dog Seizure Tracker v3 · พัฒนาโดย ร้อยเอก ทวีพล รอดปรีชา ร่วมกับ Claude (Anthropic) · แจกฟรี ห้ามจำหน่าย (CC BY-NC 4.0)<br>
+  โค้ดเปิด + แจ้งปัญหาได้ที่ https://github.com/vfullcycle/dog-seizure-tracker
+</footer>
+</div><!-- /app -->
+
+<!-- RECORD MODAL -->
+<div class="overlay" id="recModal">
+  <div class="panel">
+    <h3 id="recTitle">บันทึกการชัก</h3>
+    <div class="frow"><div class="duo2">
+      <div><label>วันที่ *</label><input type="date" id="rDate"></div>
+      <div><label>เวลา *</label><input type="time" id="rTime"></div>
+    </div></div>
+    <div class="frow"><label>ชักนาน *</label><div class="duo">
+      <input type="number" id="rDur" min="1" step="1" placeholder="เช่น 60">
+      <select id="rDurU"><option value="1">วินาที</option><option value="60">นาที</option></select>
+    </div><div class="hint">กะประมาณได้ ไม่ต้องเป๊ะ — ความยาวโดยรวมสำคัญกว่าความแม่นระดับวินาที</div></div>
+    <div class="frow"><label>ฟื้นตัวใช้เวลา (ไม่บังคับ)</label><div class="duo">
+      <input type="number" id="rRec" min="1" step="1" placeholder="จนกลับมาเดิน/ตอบสนองปกติ">
+      <select id="rRecU"><option value="1">วินาที</option><option value="60" selected>นาที</option></select>
+    </div></div>
+    <div class="frow"><label>สิ่งกระตุ้น / สถานการณ์ก่อนชัก (ไม่บังคับ)</label>
+      <input id="rTrig" list="trigList" placeholder="เช่น ชักตอนนอนหลับ, หลังออกกำลัง, เสียงดัง">
+      <datalist id="trigList"><option>ชักตอนนอนหลับ</option><option>หลังตื่นนอน / ถูกปลุก</option><option>หลังกินอาหาร</option><option>หลังออกกำลัง / เล่น</option><option>เสียงดัง / ตกใจ</option><option>อากาศร้อน</option><option>ลืมให้ยา</option><option>ไม่ทราบ</option></datalist></div>
+    <div class="frow"><label>ลักษณะการชัก (ไม่บังคับ)</label>
+      <input id="rType" list="typeList" placeholder="เช่น ชักเกร็งทั้งตัว">
+      <datalist id="typeList"><option>ชักเกร็งทั้งตัว</option><option>ชักกระตุกเฉพาะที่</option><option>น้ำลายฟูมปาก</option><option>ชักลม / เหม่อนิ่ง</option><option>ล้มตะแคง ขาตะกุย</option></datalist></div>
+    <div class="frow"><label>หมายเหตุ (ไม่บังคับ)</label><textarea id="rNote" placeholder="เช่น ให้ยาช้ากว่าปกติ 2 ชม., เพิ่งเปลี่ยนอาหาร"></textarea></div>
+    <div class="pactions">
+      <button class="btn danger sm" id="recDelBtn" style="display:none;margin-right:auto" onclick="deleteRec()">ลบรายการนี้</button>
+      <button class="btn sec" onclick="closeModals()">ยกเลิก</button>
+      <button class="btn pri" onclick="saveRec()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- DOG MODAL -->
+<div class="overlay" id="dogModal">
+  <div class="panel">
+    <h3 id="dogModalTitle">เพิ่มสุนัข</h3>
+    <div class="frow"><label>ชื่อสุนัข *</label><input id="dName"></div>
+    <div class="frow"><label>พันธุ์ (ไม่บังคับ)</label><input id="dBreed"></div>
+    <div class="frow"><label>ยาที่ได้รับ / เวลาให้ยา (ไม่บังคับ)</label><input id="dMeds"></div>
+    <div class="pactions">
+      <button class="btn danger sm" id="dogDelBtn" style="display:none;margin-right:auto" onclick="deleteDog()">ลบโปรไฟล์นี้</button>
+      <button class="btn sec" onclick="closeModals()">ยกเลิก</button>
+      <button class="btn pri" onclick="saveDog()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- TREATMENT MODAL (v3) -->
+<div class="overlay" id="treatModal">
+  <div class="panel">
+    <h3 id="treatTitle">บันทึกการรักษา</h3>
+    <div class="frow"><div class="duo2">
+      <div><label>วันที่ *</label><input type="date" id="tDate"></div>
+      <div><label>ประเภท *</label><select id="tType">
+        <option value="vet">พบสัตวแพทย์</option>
+        <option value="med">ปรับยา</option>
+        <option value="weight">ชั่งน้ำหนัก</option>
+        <option value="blood">ตรวจเลือด</option>
+      </select></div>
+    </div></div>
+    <div class="frow"><label>น้ำหนัก กก. (ไม่บังคับ)</label><input type="number" id="tWeight" min="0.1" step="0.1" placeholder="เช่น 8.5"></div>
+    <div class="frow"><label>คำแนะนำจากหมอ / บันทึก (ไม่บังคับ)</label><textarea id="tAdvice" placeholder="เช่น เพิ่มยาเช้าเป็น 1.5 เม็ด นัดเจาะเลือดอีก 1 เดือน"></textarea></div>
+    <div class="frow">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="tHasMeds" style="width:auto" onchange="document.getElementById('medEditor').style.display=this.checked?'':'none'">
+        บันทึกชุดยา ณ วันนี้ (ระบบ copy ชุดล่าสุดมาให้ แก้เฉพาะที่เปลี่ยน)
+      </label>
+      <div id="medEditor" style="display:none;margin-top:8px">
+        <div id="medRows"></div>
+        <button class="btn sec sm" type="button" onclick="addMedRow()">＋ เพิ่มยา</button>
+        <div class="hint">ขนาด = ต่อการให้ 1 ครั้ง · เวลาให้ เช่น "07:00 / 19:00" หรือ "เช้า-เย็น พร้อมอาหาร"</div>
+      </div>
+    </div>
+    <div class="pactions">
+      <button class="btn danger sm" id="treatDelBtn" style="display:none;margin-right:auto" onclick="deleteTreat()">ลบรายการนี้</button>
+      <button class="btn sec" onclick="closeModals()">ยกเลิก</button>
+      <button class="btn pri" onclick="saveTreat()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+/* ================= STORAGE =================
+   เก็บทุกอย่างใน key เดียว — ถ้า localStorage ใช้ไม่ได้ (เช่นเปิดใน preview)
+   จะ fallback เป็นตัวแปรในหน่วยความจำ: ใช้ได้ปกติแต่ไม่ persist */
+const KEY="dogSeizureTracker.v2"; /* คง key เดิม — ข้อมูลผู้ใช้ v2 ต้องรอดข้าม version */
+let memFallback=null;
+function normalizeDB(d){ /* migration v2 → v3: เพิ่ม treatments ให้ทุกตัว */
+  d.version=3;
+  d.dogs.forEach(g=>{if(!Array.isArray(g.treatments))g.treatments=[]});
+  return d;
+}
+function loadDB(){
+  try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&Array.isArray(d.dogs))return normalizeDB(d)}catch(e){}
+  return memFallback||{version:3,dogs:[],activeDogId:null};
+}
+function saveDB(){
+  memFallback=DB;
+  try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}
+}
+let DB=loadDB();
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const activeDog=()=>DB.dogs.find(d=>d.id===DB.activeDogId)||DB.dogs[0]||null;
+
+/* ================= HELPERS ================= */
+const THM=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+const fmtDur=s=>s==null?"–":(s<60?s+" วิ":(s%60===0?(s/60):(s/60).toFixed(1))+" นาที");
+const fmtDate=d=>`${d.getDate()} ${THM[d.getMonth()]} ${d.getFullYear()}`;
+const fmtDT=d=>`${fmtDate(d)} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+Chart.defaults.font.family="'IBM Plex Sans Thai',sans-serif";
+Chart.defaults.color="#5C7570";
+let charts={};
+function toast(t,ok=true){const m=document.getElementById("tbMsg");m.textContent=t;m.style.color=ok?"var(--teal)":"var(--red)";setTimeout(()=>{if(m.textContent===t)m.textContent=""},5000)}
+
+/* ================= DURATION BINS ================= */
+const BIN_LBL=["≤15 วิ","16–30 วิ","31–60 วิ","1–2 นาที","2–5 นาที",">5 นาที"];
+function binDur(s){return s<=15?0:s<=30?1:s<=60?2:s<=120?3:s<=300?4:5}
+
+/* ================= INSIGHTS (generalized) ================= */
+function computeInsights(all,clusterCount){
+  const now=new Date(),ins=[];
+  const n=all.length;if(!n)return ins;
+  // ชักนาน ≥5 นาที = ภาวะฉุกเฉิน
+  const longest=Math.max(...all.map(r=>r.dur));
+  if(longest>=300)ins.push({c:"red",b:`เคยชักนานถึง ${fmtDur(longest)}`,t:"การชักต่อเนื่อง ≥5 นาที (status epilepticus) เป็นภาวะฉุกเฉิน — ครั้งหน้าหากถึง 5 นาทีให้รีบไปโรงพยาบาลสัตว์ทันที"});
+  // ความถี่ 30 วันล่าสุด เทียบค่าเฉลี่ยรายเดือนของตัวเอง (6 เดือนก่อนหน้า)
+  const last30=all.filter(r=>(now-r.dt)/864e5<=30).length;
+  const prior=all.filter(r=>{const d=(now-r.dt)/864e5;return d>30&&d<=210}).length;
+  const priorAvg=prior/6;
+  if(last30>=2&&priorAvg>0&&last30>=priorAvg*2)ins.push({c:"red",b:`30 วันล่าสุดชัก ${last30} ครั้ง (เฉลี่ยเดิม ~${priorAvg.toFixed(1)} ครั้ง/เดือน)`,t:"ความถี่สูงกว่าปกติของตัวเองชัดเจน ควรพาไปพบสัตวแพทย์เพื่อทบทวนยา"});
+  else if(last30===0&&n>=3)ins.push({c:"teal",b:"30 วันล่าสุดไม่มีการชัก",t:"แนวโน้มดี — บันทึกต่อเนื่องเพื่อยืนยันว่ายาคุมอาการได้"});
+  // pattern กลางคืน (ต้องมีข้อมูลพอ)
+  const night=all.filter(r=>r.dt.getHours()<6).length;
+  if(n>=10&&night/n>=0.4)ins.push({c:"teal",b:`${Math.round(night/n*100)}% ชักช่วง 00:00–06:00`,t:"อาจสัมพันธ์กับระดับยาในเลือดต่ำช่วงก่อนมื้อยาเช้า — ลองปรึกษาหมอเรื่องเวลาการให้ยา"});
+  // cluster
+  if(clusterCount>0)ins.push({c:"amber",b:`มีวันที่ชักซ้ำ ${clusterCount} วัน`,t:"การชักหลายครั้งใน 24 ชม. (cluster) เพิ่มความเสี่ยง — จดเวลาแต่ละครั้งให้ครบเพื่อให้หมอเห็น pattern"});
+  return ins;
+}
+
+/* ================= FILTER ================= */
+let F={from:null,to:null};
+function refresh(){Object.values(charts).forEach(c=>c.destroy());charts={};render()}
+function markChip(el){document.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));if(el)el.classList.add("on")}
+function setPreset(p,el){
+  markChip(el);
+  document.getElementById("fFrom").value="";document.getElementById("fTo").value="";
+  const now=new Date();
+  if(p==="all")F={from:null,to:null};
+  else if(p==="ytd")F={from:new Date(now.getFullYear(),0,1),to:null};
+  else F={from:new Date(now-p*864e5),to:null};
+  refresh();
+}
+function setCustomRange(){
+  markChip(null);
+  const f=document.getElementById("fFrom").value,t=document.getElementById("fTo").value;
+  F={from:f?new Date(f+"T00:00"):null,to:t?new Date(t+"T23:59"):null};
+  refresh();
+}
+
+/* ================= DOG CRUD ================= */
+let editingDog=false;
+function refreshDogSelect(){
+  const sel=document.getElementById("dogSelect");
+  sel.innerHTML=DB.dogs.map(d=>`<option value="${d.id}" ${d.id===DB.activeDogId?"selected":""}>${esc(d.name)}</option>`).join("");
+}
+function switchDog(id){DB.activeDogId=id;saveDB();F={from:null,to:null};markChip(document.querySelector('.chip'));refresh()}
+function openDogModal(edit){
+  editingDog=edit;
+  const d=edit?activeDog():null;
+  document.getElementById("dogModalTitle").textContent=edit?`แก้ไขโปรไฟล์ ${d.name}`:"เพิ่มสุนัข";
+  document.getElementById("dName").value=d?d.name:"";
+  document.getElementById("dBreed").value=d?d.breed||"":"";
+  document.getElementById("dMeds").value=d?d.meds||"":"";
+  document.getElementById("dogDelBtn").style.display=edit&&DB.dogs.length>0?"":"none";
+  document.getElementById("dogModal").classList.add("open");
+}
+function saveDog(){
+  const name=document.getElementById("dName").value.trim();
+  if(!name){alert("กรุณาใส่ชื่อสุนัข");return}
+  const breed=document.getElementById("dBreed").value.trim(),meds=document.getElementById("dMeds").value.trim();
+  if(editingDog){const d=activeDog();d.name=name;d.breed=breed;d.meds=meds}
+  else{const d={id:uid(),name,breed,meds,records:[],treatments:[]};DB.dogs.push(d);DB.activeDogId=d.id}
+  saveDB();closeModals();boot();
+}
+function deleteDog(){
+  const d=activeDog();
+  if(!confirm(`ลบโปรไฟล์ "${d.name}" และบันทึกทั้งหมด ${d.records.length} รายการ? การลบย้อนกลับไม่ได้`))return;
+  DB.dogs=DB.dogs.filter(x=>x.id!==d.id);
+  DB.activeDogId=DB.dogs[0]?.id||null;
+  saveDB();closeModals();boot();
+}
+
+/* ================= RECORD CRUD ================= */
+let editingRecId=null;
+function openRecModal(rec){
+  editingRecId=rec?rec.id:null;
+  document.getElementById("recTitle").textContent=rec?"แก้ไขบันทึก":"บันทึกการชัก";
+  document.getElementById("recDelBtn").style.display=rec?"":"none";
+  const now=new Date();
+  const dt=rec?new Date(rec.dt):now;
+  document.getElementById("rDate").value=dayKey(dt);
+  document.getElementById("rTime").value=`${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`;
+  if(rec){
+    if(rec.dur%60===0&&rec.dur>=60){document.getElementById("rDur").value=rec.dur/60;document.getElementById("rDurU").value="60"}
+    else{document.getElementById("rDur").value=rec.dur;document.getElementById("rDurU").value="1"}
+    if(rec.rec!=null){
+      if(rec.rec%60===0&&rec.rec>=60){document.getElementById("rRec").value=rec.rec/60;document.getElementById("rRecU").value="60"}
+      else{document.getElementById("rRec").value=rec.rec;document.getElementById("rRecU").value="1"}
+    }else document.getElementById("rRec").value="";
+  }else{document.getElementById("rDur").value="";document.getElementById("rRec").value="";document.getElementById("rDurU").value="1";document.getElementById("rRecU").value="60"}
+  document.getElementById("rTrig").value=rec?rec.trig||"":"";
+  document.getElementById("rType").value=rec?rec.type||"":"";
+  document.getElementById("rNote").value=rec?rec.note||"":"";
+  document.getElementById("recModal").classList.add("open");
+}
+function saveRec(){
+  const date=document.getElementById("rDate").value,time=document.getElementById("rTime").value;
+  const durV=parseFloat(document.getElementById("rDur").value);
+  if(!date||!time||!(durV>0)){alert("กรุณาใส่วันที่ เวลา และระยะเวลาชัก");return}
+  const dur=Math.round(durV*+document.getElementById("rDurU").value);
+  const recV=parseFloat(document.getElementById("rRec").value);
+  const rec=recV>0?Math.round(recV*+document.getElementById("rRecU").value):null;
+  const item={
+    id:editingRecId||uid(),
+    dt:`${date}T${time}`,dur,rec,
+    trig:document.getElementById("rTrig").value.trim(),
+    type:document.getElementById("rType").value.trim(),
+    note:document.getElementById("rNote").value.trim()
+  };
+  const d=activeDog();
+  if(editingRecId){const i=d.records.findIndex(r=>r.id===editingRecId);d.records[i]=item}
+  else d.records.push(item);
+  saveDB();closeModals();refresh();toast(editingRecId?"✓ แก้ไขแล้ว":"✓ บันทึกแล้ว");
+}
+function deleteRec(){
+  if(!confirm("ลบบันทึกนี้?"))return;
+  const d=activeDog();
+  d.records=d.records.filter(r=>r.id!==editingRecId);
+  saveDB();closeModals();refresh();toast("✓ ลบแล้ว");
+}
+function editRec(id){const r=activeDog().records.find(x=>x.id===id);if(r)openRecModal(r)}
+function closeModals(){document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("open"))}
+
+/* ================= BACKUP ================= */
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(DB,null,1)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`seizure-tracker-backup-${dayKey(new Date())}.json`;
+  a.click();URL.revokeObjectURL(a.href);
+  toast("✓ ดาวน์โหลดไฟล์สำรองแล้ว");
+}
+function importJSON(input){
+  const f=input.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const d=JSON.parse(rd.result);
+      if(!d||!Array.isArray(d.dogs))throw 0;
+      if(!confirm(`นำเข้าข้อมูล ${d.dogs.length} โปรไฟล์ — จะแทนที่ข้อมูลปัจจุบันทั้งหมด ต้องการต่อไหม?`))return;
+      DB=normalizeDB(d);DB.activeDogId=DB.dogs[0]?.id||null;saveDB();boot();toast("✓ นำเข้าสำเร็จ");
+    }catch(e){toast("✕ ไฟล์ไม่ถูกต้อง — ต้องเป็นไฟล์สำรองจากเครื่องมือนี้",false)}
+  };
+  rd.readAsText(f);input.value="";
+}
+function exportCSV(){
+  const d=activeDog();if(!d||!d.records.length){toast("ยังไม่มีข้อมูลให้ export",false);return}
+  const rows=[["วันและเวลาที่ชัก","ชักนาน (วินาที)","ฟื้นตัว (วินาที)","สิ่งกระตุ้น","ลักษณะการชัก","หมายเหตุ"]];
+  [...d.records].sort((a,b)=>a.dt.localeCompare(b.dt)).forEach(r=>rows.push([r.dt.replace("T"," "),r.dur,r.rec??"",r.trig,r.type,r.note]));
+  const csv="\uFEFF"+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download=`${d.name}-seizure-log.csv`;a.click();URL.revokeObjectURL(a.href);
+}
+
+/* ================= DEMO DATA (สังเคราะห์ ไม่ใช่ข้อมูลจริง) ================= */
+function loadDemo(){
+  const now=new Date();
+  const mk=(daysAgo,h,m,dur,rec,trig,type,note)=>{
+    const d=new Date(now-daysAgo*864e5);d.setHours(h,m,0,0);
+    return {id:uid(),dt:`${dayKey(d)}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`,dur,rec,trig:trig||"",type:type||"",note:note||""};
+  };
+  const demo={id:uid(),name:"น้องเดโม่",breed:"พันธุ์ผสม (ข้อมูลสมมติ)",meds:"ยากันชัก เช้า-เย็น 07:00 / 19:00",records:[
+    mk(430,3,10,60,null),mk(395,5,40,45,null),mk(340,2,20,90,null),
+    mk(300,14,30,60,null),mk(260,4,15,30,null),mk(220,1,50,120,300,"ชักตอนนอนหลับ","ชักเกร็งทั้งตัว"),
+    mk(180,6,5,60,240,"หลังตื่นนอน / ถูกปลุก","ชักเกร็งทั้งตัว"),mk(150,23,40,45,180,"ชักตอนนอนหลับ"),
+    mk(95,3,30,90,300,"ชักตอนนอนหลับ","ชักเกร็งทั้งตัว"),mk(60,15,0,30,120,"หลังออกกำลัง / เล่น","ชักกระตุกเฉพาะที่"),
+    mk(41,2,45,60,300,"ลืมให้ยา","ชักเกร็งทั้งตัว","ให้ยาช้า 3 ชม."),mk(41,3,5,120,420,"ชักต่อเนื่อง","ชักเกร็งทั้งตัว"),
+    mk(20,4,55,60,240,"ชักตอนนอนหลับ","ชักเกร็งทั้งตัว"),mk(6,13,20,45,150,"เสียงดัง / ตกใจ","ชักลม / เหม่อนิ่ง")
+  ]};
+  const tmk=(daysAgo,type,weight,advice,meds)=>({id:uid(),date:dayKey(new Date(now-daysAgo*864e5)),type,weight:weight||null,advice:advice||"",meds:meds||[]});
+  demo.treatments=[
+    tmk(440,"vet",11.8,"เริ่มยากันชักหลังวินิจฉัย นัดติดตาม 3 เดือน",[{name:"Phenobarbital",dose:30,unit:"mg",freq:"07:00 / 19:00",how:""}]),
+    tmk(250,"weight",12.3),
+    tmk(150,"blood",null,"ระดับยาในเลือดอยู่ในช่วงเป้าหมาย คงยาเดิม"),
+    tmk(35,"vet",12.6,"ชักถี่ขึ้นหลังมี cluster — เพิ่มขนาดยาเช้า และเพิ่มยาตัวที่สอง นัดเจาะเลือด 1 เดือน",[{name:"Phenobarbital",dose:45,unit:"mg",freq:"07:00 / 19:00",how:""},{name:"KBr",dose:250,unit:"mg",freq:"19:00 พร้อมอาหาร",how:""}])
+  ];
+  DB.dogs.push(demo);DB.activeDogId=demo.id;saveDB();boot();
+  toast("โหลดข้อมูลสมมติแล้ว — ลบได้ที่ 'แก้ไขโปรไฟล์'");
+}
+function obCreate(){
+  const name=document.getElementById("obName").value.trim();
+  if(!name){alert("กรุณาใส่ชื่อสุนัข");return}
+  const d={id:uid(),name,breed:document.getElementById("obBreed").value.trim(),meds:document.getElementById("obMeds").value.trim(),records:[],treatments:[]};
+  DB.dogs.push(d);DB.activeDogId=d.id;saveDB();boot();
+}
+
+/* ================= TREATMENT (v3) ================= */
+const TTYPE={vet:"พบสัตวแพทย์",med:"ปรับยา",weight:"ชั่งน้ำหนัก",blood:"ตรวจเลือด"};
+let editingTreatId=null;
+const treatSorted=d=>[...(d.treatments||[])].sort((a,b)=>a.date.localeCompare(b.date));
+function latestMeds(d){ /* snapshot ล่าสุด */
+  const t=treatSorted(d).filter(t=>t.meds&&t.meds.length);
+  return t.length?t[t.length-1]:null;
+}
+function latestWeight(d){
+  const t=treatSorted(d).filter(t=>t.weight>0);
+  return t.length?t[t.length-1]:null;
+}
+const fmtMed=m=>`${m.name} ${m.dose||""}${m.dose?" "+m.unit:""}${m.freq?" · "+m.freq:""}${m.how?" ("+m.how+")":""}`;
+function medRowHTML(m={name:"",dose:"",unit:"mg",freq:"",how:""}){
+  const u=["mg","เม็ด","แคปซูล","ml"].map(x=>`<option ${m.unit===x?"selected":""}>${x}</option>`).join("");
+  return `<div class="medrow">
+    <input class="mName" placeholder="ชื่อยา" value="${esc(m.name)}">
+    <input class="mDose" type="number" min="0" step="0.05" placeholder="ขนาด" value="${m.dose??""}">
+    <select class="mUnit">${u}</select>
+    <input class="mFreq" placeholder="เวลาให้" value="${esc(m.freq)}">
+    <button class="rm" type="button" onclick="this.parentElement.remove()">✕</button>
+  </div>`;
+}
+function addMedRow(m){document.getElementById("medRows").insertAdjacentHTML("beforeend",medRowHTML(m))}
+function readMedRows(){
+  return [...document.querySelectorAll("#medRows .medrow")].map(r=>({
+    name:r.querySelector(".mName").value.trim(),
+    dose:parseFloat(r.querySelector(".mDose").value)||null,
+    unit:r.querySelector(".mUnit").value,
+    freq:r.querySelector(".mFreq").value.trim(),
+    how:""
+  })).filter(m=>m.name);
+}
+function openTreatModal(t){
+  editingTreatId=t?t.id:null;
+  document.getElementById("treatTitle").textContent=t?"แก้ไขบันทึกการรักษา":"บันทึกการรักษา";
+  document.getElementById("treatDelBtn").style.display=t?"":"none";
+  document.getElementById("tDate").value=t?t.date:dayKey(new Date());
+  document.getElementById("tType").value=t?t.type:"vet";
+  document.getElementById("tWeight").value=t&&t.weight?t.weight:"";
+  document.getElementById("tAdvice").value=t?t.advice||"":"";
+  const rows=document.getElementById("medRows");rows.innerHTML="";
+  const src=t&&t.meds&&t.meds.length?t.meds:(latestMeds(activeDog())?.meds||[]);
+  src.forEach(m=>addMedRow(m));
+  const hasMeds=!!(t&&t.meds&&t.meds.length);
+  document.getElementById("tHasMeds").checked=hasMeds;
+  document.getElementById("medEditor").style.display=hasMeds?"":"none";
+  document.getElementById("treatModal").classList.add("open");
+}
+function saveTreat(){
+  const date=document.getElementById("tDate").value;
+  if(!date){alert("กรุณาใส่วันที่");return}
+  const w=parseFloat(document.getElementById("tWeight").value);
+  const item={
+    id:editingTreatId||uid(),
+    date,type:document.getElementById("tType").value,
+    weight:w>0?w:null,
+    advice:document.getElementById("tAdvice").value.trim(),
+    meds:document.getElementById("tHasMeds").checked?readMedRows():[]
+  };
+  const d=activeDog();
+  if(editingTreatId){const i=d.treatments.findIndex(t=>t.id===editingTreatId);d.treatments[i]=item}
+  else (d.treatments??=[]).push(item);
+  saveDB();closeModals();refresh();toast(editingTreatId?"✓ แก้ไขแล้ว":"✓ บันทึกการรักษาแล้ว");
+}
+function deleteTreat(){
+  if(!confirm("ลบบันทึกการรักษานี้?"))return;
+  const d=activeDog();
+  d.treatments=d.treatments.filter(t=>t.id!==editingTreatId);
+  saveDB();closeModals();refresh();toast("✓ ลบแล้ว");
+}
+function editTreat(id){const t=activeDog().treatments.find(x=>x.id===id);if(t)openTreatModal(t)}
+
+/* annotation plugin: เส้นประแนวตั้ง + ป้าย บนกราฟ (เขียนเองไม่พึ่ง CDN เพิ่ม) */
+const annoPlugin={
+  id:"anno",
+  afterDatasetsDraw(chart,args,opts){
+    if(!opts||!opts.points||!opts.points.length)return;
+    const {ctx,chartArea:{top,bottom},scales:{x}}=chart;
+    ctx.save();
+    opts.points.forEach((p,i)=>{
+      const px=x.getPixelForValue(p.x);
+      if(px<chart.chartArea.left-2||px>chart.chartArea.right+2||isNaN(px))return;
+      ctx.strokeStyle=p.color;ctx.setLineDash([4,3]);ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.moveTo(px,top);ctx.lineTo(px,bottom);ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.font="9px 'IBM Plex Sans Thai'";
+      const tw=ctx.measureText(p.label).width+8;
+      const ly=top+2+(i%2)*13; /* สลับสูงต่ำกันป้ายทับ */
+      ctx.fillStyle=p.color;
+      if(ctx.roundRect){ctx.beginPath();ctx.roundRect(px-tw/2,ly,tw,12,6);ctx.fill()}
+      else ctx.fillRect(px-tw/2,ly,tw,12);
+      ctx.fillStyle="#fff";ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText(p.label,px,ly+6);
+    });
+    ctx.restore();
+  }
+};
+Chart.register(annoPlugin);
+function annoPoints(dog,mapX){ /* เฉพาะ พบหมอ/ปรับยา — น้ำหนักมีกราฟของตัวเอง */
+  return treatSorted(dog).filter(t=>t.type==="vet"||t.type==="med"||(t.meds&&t.meds.length))
+    .map(t=>({x:mapX(new Date(t.date+"T12:00")),label:t.meds&&t.meds.length?"ปรับยา":TTYPE[t.type],
+      color:t.meds&&t.meds.length||t.type==="med"?"#D98E04":"#0E7C7B"}))
+    .filter(p=>p.x!=null);
+}
+
+function renderTreatments(dog){
+  const ts=treatSorted(dog);
+  /* การรักษาปัจจุบัน */
+  const lm=latestMeds(dog),lw=latestWeight(dog);
+  const chips=document.getElementById("curMedChips");
+  const sub=document.getElementById("curMedSub");
+  if(lm){
+    sub.textContent=`ชุดยาตามบันทึกวันที่ ${fmtDate(new Date(lm.date+"T12:00"))}`+(lw?` · น้ำหนักล่าสุด ${lw.weight} กก. (${fmtDate(new Date(lw.date+"T12:00"))})`:"");
+    chips.innerHTML=lm.meds.map(m=>{
+      const mgkg=m.unit==="mg"&&m.dose&&lw?` ≈ ${(m.dose/lw.weight).toFixed(1)} mg/kg/ครั้ง`:"";
+      return `<span class="medchip">${esc(fmtMed(m))}${mgkg}</span>`;
+    }).join("");
+  }else{
+    sub.textContent=dog.meds?`จากโปรไฟล์: ${dog.meds} — กด "＋ การรักษา/น้ำหนัก" เพื่อบันทึกชุดยาแบบละเอียด`:'ยังไม่มีบันทึก — กด "＋ การรักษา/น้ำหนัก" เพื่อเริ่มบันทึกยา น้ำหนัก และการพบหมอ';
+    chips.innerHTML="";
+  }
+  /* ตารางประวัติ (ตาม filter ร่วม) + ฉบับ print (เต็มเสมอ) */
+  const inF=t=>{const d=new Date(t.date+"T12:00");return (!F.from||d>=F.from)&&(!F.to||d<=F.to)};
+  const rows=t=>`<td class="mono">${fmtDate(new Date(t.date+"T12:00"))}</td>
+    <td><span class="ttag ${t.type}">${TTYPE[t.type]||t.type}</span></td>
+    <td class="mono">${t.weight?t.weight+" กก.":'<span class="dim">–</span>'}</td>
+    <td style="font-size:.76rem">${t.meds&&t.meds.length?t.meds.map(m=>esc(fmtMed(m))).join("<br>"):'<span class="dim">–</span>'}</td>
+    <td style="font-size:.76rem">${esc(t.advice)||'<span class="dim">–</span>'}</td>`;
+  const fts=ts.filter(inF).reverse();
+  document.getElementById("treatScope").textContent=fts.length===ts.length?`(ทั้งหมด ${ts.length} รายการ)`:`(แสดง ${fts.length} จาก ${ts.length} รายการ)`;
+  document.querySelector("#tblTreat tbody").innerHTML=fts.length?fts.map(t=>
+    `<tr>${rows(t)}<td class="mono"><button class="rowbtn" onclick="editTreat('${t.id}')">แก้ไข</button></td></tr>`).join("")
+    :`<tr><td colspan="6" class="dim">ยังไม่มีบันทึกการรักษา${ts.length?"ในช่วงที่เลือก":""}</td></tr>`;
+  document.querySelector("#tblTreatPrint tbody").innerHTML=[...ts].reverse().map(t=>`<tr>${rows(t)}</tr>`).join("");
+  /* กราฟน้ำหนัก */
+  const wts=ts.filter(t=>t.weight>0);
+  document.getElementById("weightSec").style.display=wts.length>=2?"":"none";
+  if(wts.length>=2){
+    charts.w=new Chart(chWeight,{type:"line",data:{datasets:[{
+      data:wts.map(t=>({x:new Date(t.date+"T12:00").getTime(),y:t.weight})),
+      borderColor:"#0E7C7B",backgroundColor:"rgba(14,124,123,.12)",fill:true,
+      pointRadius:4,pointBackgroundColor:"#0E7C7B",borderWidth:1.5,tension:.2}]},
+      options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{
+        title:i=>fmtDate(new Date(i[0].parsed.x)),label:c=>`${c.parsed.y} กก.`}}},
+      scales:{x:{type:"linear",ticks:{callback:v=>{const d=new Date(v);return `${THM[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`},maxTicksLimit:8},grid:{display:false}},
+              y:{title:{display:true,text:"กก."},grid:{color:"#EDF3F2"}}}}});
+  }
+}
+
+/* ================= RENDER ================= */
+function render(){
+  const dog=activeDog();if(!dog)return;
+  document.getElementById("dogTitle").textContent=dog.name;
+  refreshDogSelect();
+  const hasData=dog.records.length>0;
+  document.getElementById("chartsArea").style.display=hasData?"":"none";
+  document.getElementById("emptyState").style.display=hasData?"none":"";
+  document.querySelector(".hero").style.display=hasData?"":"none";
+  document.getElementById("kpiRow").style.display=hasData?"":"none";
+  document.getElementById("insightRow").innerHTML="";
+  renderTreatments(dog); /* v3: การรักษาแสดงเสมอ ไม่ผูกกับบันทึกชัก */
+  if(!hasData){document.getElementById("emptyDogName").textContent=dog.name;return}
+
+  const all=dog.records.map(r=>({...r,dt:new Date(r.dt)})).sort((a,b)=>a.dt-b.dt);
+  const now=new Date();
+  const lastAll=all[all.length-1].dt;
+
+  /* hero = สถานะปัจจุบัน ไม่ขึ้นกับ filter */
+  const lmHero=latestMeds(dog);
+  const medsLine=lmHero?lmHero.meds.map(m=>m.name+(m.dose?` ${m.dose} ${m.unit}`:"")).join(", "):dog.meds;
+  document.getElementById("freeDays").textContent=Math.floor((now-lastAll)/864e5);
+  document.getElementById("heroSince").textContent=`ชักครั้งล่าสุด: ${fmtDT(lastAll)}${medsLine?` · ยา: ${medsLine}`:""}`;
+
+  /* filtered set */
+  const recs=all.filter(r=>(!F.from||r.dt>=F.from)&&(!F.to||r.dt<=F.to));
+  document.getElementById("scopeNote").textContent=recs.length===all.length?`(ทั้งหมด ${all.length} ครั้ง)`:`(แสดง ${recs.length} จาก ${all.length} ครั้ง)`;
+  if(!recs.length){
+    document.getElementById("kpiRow").innerHTML="";
+    document.getElementById("insightRow").innerHTML=`<div class="insight amber"><b>ไม่มีข้อมูลในช่วงวันที่ที่เลือก</b>ปรับช่วงหรือกด "ทั้งหมด"</div>`;
+    document.getElementById("stripSvg").innerHTML="";
+    document.querySelector("#tblCluster tbody").innerHTML="";
+    document.querySelector("#tblDetail tbody").innerHTML="";
+    document.getElementById("chartsArea").style.display="none";
+    return;
+  }
+  const first=recs[0].dt,last=recs[recs.length-1].dt;
+
+  /* clusters */
+  const byDay={};
+  recs.forEach(r=>{(byDay[dayKey(r.dt)]??=[]).push(r)});
+  const clusterDays=Object.entries(byDay).filter(([,v])=>v.length>=2).sort((a,b)=>b[0].localeCompare(a[0]));
+  const clusterSet=new Set(clusterDays.map(([k])=>k));
+
+  /* strip */
+  const span=Math.max(last-first,1),W=1000,H=52;
+  let ticks="";
+  recs.forEach(r=>{
+    const x=(r.dt-first)/span*(W-8)+4;
+    const h=10+Math.min(r.dur,300)/300*30;
+    ticks+=`<line x1="${x.toFixed(1)}" y1="${H-4}" x2="${x.toFixed(1)}" y2="${(H-4-h).toFixed(1)}" stroke="${clusterSet.has(dayKey(r.dt))?"#FF9B8F":"rgba(255,255,255,.75)"}" stroke-width="2.5"/>`;
+  });
+  const svg=document.getElementById("stripSvg");
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  svg.innerHTML=`<line x1="0" y1="${H-3}" x2="${W}" y2="${H-3}" stroke="rgba(255,255,255,.25)" stroke-width="1"/>`+ticks;
+  document.getElementById("stripStart").textContent=fmtDate(first);
+  document.getElementById("stripEnd").textContent=fmtDate(last);
+
+  /* KPI */
+  const avg=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:null;
+  const durs=recs.map(r=>r.dur),recsRec=recs.filter(r=>r.rec!=null);
+  const fmtAvg=s=>s==null?"–":(s>=60?(s/60).toFixed(1)+" นาที":Math.round(s)+" วิ");
+  const maxDur=Math.max(...durs);
+  const kpis=[
+    {v:recs.length,k:"ครั้งทั้งหมด",n:`ช่วง ${fmtDate(first)} – ${fmtDate(last)}`},
+    {v:fmtAvg(avg(durs)),k:"ชักเฉลี่ยต่อครั้ง",n:`ยาวสุด ${fmtDur(maxDur)}`,cls:maxDur>=300?"warn":""},
+    {v:fmtAvg(avg(recsRec.map(r=>r.rec))),k:"ฟื้นตัวเฉลี่ย",n:`จาก ${recsRec.length} ครั้งที่บันทึก`},
+    {v:clusterDays.length,k:"วันที่ชักซ้ำ (cluster)",n:"ชัก ≥2 ครั้ง/วัน",cls:clusterDays.length?"bad":""},
+  ];
+  document.getElementById("kpiRow").style.display="";
+  document.getElementById("kpiRow").innerHTML=kpis.map(x=>
+    `<div class="kpi"><div class="v ${x.cls||""}">${x.v}</div><div class="k">${x.k}</div><div class="n">${x.n||""}</div></div>`).join("");
+
+  /* insights: ใช้ข้อมูลทั้งหมด (สถานะปัจจุบัน) ไม่ใช่ชุดกรอง */
+  const allByDay={};all.forEach(r=>{(allByDay[dayKey(r.dt)]??=[]).push(r)});
+  const allClusters=Object.values(allByDay).filter(v=>v.length>=2).length;
+  document.getElementById("insightRow").innerHTML=computeInsights(all,allClusters).map(x=>
+    `<div class="insight ${x.c}"><b>${esc(x.b)}</b>${esc(x.t)}</div>`).join("");
+
+  /* monthly */
+  const mKeys=[],mLbls=[];
+  for(let d=new Date(first.getFullYear(),first.getMonth(),1);d<=last;d.setMonth(d.getMonth()+1)){
+    mKeys.push(`${d.getFullYear()}-${d.getMonth()}`);
+    mLbls.push(`${THM[d.getMonth()]}${d.getMonth()===0||mKeys.length===1?" "+String(d.getFullYear()).slice(2):""}`);
+  }
+  const mCnt=mKeys.map(k=>recs.filter(r=>`${r.dt.getFullYear()}-${r.dt.getMonth()}`===k).length);
+  document.getElementById("monthlyBox").style.minWidth=Math.max(mLbls.length*16,300)+"px";
+  const mAnno=annoPoints(dog,d=>{ /* วันที่ → ตำแหน่งเดือน (มีเศษวันในเดือน) */
+    const i=mKeys.indexOf(`${d.getFullYear()}-${d.getMonth()}`);
+    return i<0?null:i+(d.getDate()-1)/31-0.5;
+  });
+  charts.m=new Chart(chMonthly,{type:"bar",data:{labels:mLbls,datasets:[{data:mCnt,
+    backgroundColor:mCnt.map(v=>v>=3?"#C4453C":v>=2?"#D98E04":"#0E7C7B"),borderRadius:3,maxBarThickness:18}]},
+    options:{maintainAspectRatio:false,plugins:{anno:{points:mAnno},legend:{display:false},tooltip:{callbacks:{title:i=>{
+      const [yy,mm]=mKeys[i[0].dataIndex].split("-");return `${THM[+mm]} ${yy}`}}}},
+    scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,font:{size:10}}},
+            y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:"#EDF3F2"}}}}});
+
+  /* time of day */
+  const buckets=[0,0,0,0];
+  recs.forEach(r=>buckets[Math.floor(r.dt.getHours()/6)]++);
+  charts.t=new Chart(chTime,{type:"bar",data:{labels:["00:00–06:00","06:00–12:00","12:00–18:00","18:00–24:00"],
+    datasets:[{data:buckets,backgroundColor:["#16302B","#0E7C7B","#D98E04","#5C7570"],borderRadius:6,maxBarThickness:56}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:"#EDF3F2"}},x:{grid:{display:false},ticks:{font:{size:10}}}}}});
+
+  /* duration bins */
+  const bins=[0,0,0,0,0,0];
+  recs.forEach(r=>bins[binDur(r.dur)]++);
+  charts.d=new Chart(chDur,{type:"bar",data:{labels:BIN_LBL,datasets:[{data:bins,
+    backgroundColor:["#BEDCDA","#7FB8B5","#0E7C7B","#D98E04","#E06B2D","#C4453C"],borderRadius:6,maxBarThickness:44}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:"#EDF3F2"}},x:{grid:{display:false},ticks:{font:{size:10}}}}}});
+
+  /* gap */
+  const gapPts=[];
+  for(let i=1;i<recs.length;i++)gapPts.push({x:recs[i].dt.getTime(),y:Math.max((recs[i].dt-recs[i-1].dt)/864e5,0.02)});
+  const gAnno=annoPoints(dog,d=>d.getTime());
+  charts.g=new Chart(chGap,{type:"line",data:{datasets:[{data:gapPts,borderColor:"#0E7C7B",
+    backgroundColor:"rgba(14,124,123,.12)",fill:true,pointRadius:2.5,pointBackgroundColor:"#0E7C7B",borderWidth:1.5,tension:.15}]},
+    options:{maintainAspectRatio:false,plugins:{anno:{points:gAnno},legend:{display:false},tooltip:{callbacks:{
+      label:c=>`ห่างครั้งก่อน ${c.parsed.y<1?Math.round(c.parsed.y*24)+" ชม.":c.parsed.y.toFixed(0)+" วัน"}`,
+      title:i=>fmtDate(new Date(i[0].parsed.x))}}},
+    scales:{x:{type:"linear",ticks:{callback:v=>{const d=new Date(v);return `${THM[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`},maxTicksLimit:8},grid:{display:false}},
+            y:{type:"logarithmic",title:{display:true,text:"วัน (log)"},grid:{color:"#EDF3F2"}}}}});
+
+  /* scatter */
+  charts.s=new Chart(chScatter,{type:"scatter",data:{datasets:[{data:recsRec.map(r=>({x:r.dur/60,y:r.rec/60,d:r.dt})),
+    backgroundColor:"rgba(196,69,60,.75)",pointRadius:6,pointHoverRadius:8}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{
+      label:c=>`${fmtDate(c.raw.d)}: ชัก ${c.parsed.x.toFixed(1)} นาที → ฟื้น ${c.parsed.y.toFixed(1)} นาที`}}},
+    scales:{x:{title:{display:true,text:"ชักนาน (นาที)"},beginAtZero:true,grid:{color:"#EDF3F2"}},
+            y:{title:{display:true,text:"ฟื้นตัว (นาที)"},beginAtZero:true,grid:{color:"#EDF3F2"}}}}});
+
+  /* cluster table */
+  document.querySelector("#tblCluster tbody").innerHTML=clusterDays.length?clusterDays.map(([k,v])=>{
+    v.sort((a,b)=>a.dt-b.dt);
+    const times=v.map(r=>`${String(r.dt.getHours()).padStart(2,"0")}:${String(r.dt.getMinutes()).padStart(2,"0")}`).join(", ");
+    const gaps=v.slice(1).map((r,i)=>{const g=(r.dt-v[i].dt)/6e4;return g<60?Math.round(g)+" นาที":(g/60).toFixed(1)+" ชม."}).join(", ");
+    return `<tr><td class="mono">${fmtDate(v[0].dt)}</td><td><span class="tag ${v.length>=3?"red":"amber"}">${v.length} ครั้ง</span></td><td class="mono">${times}</td><td class="mono">${gaps||"–"}</td></tr>`;
+  }).join(""):`<tr><td colspan="4" class="dim">ไม่มีวันชักซ้ำในช่วงที่เลือก — เป็นสัญญาณที่ดี</td></tr>`;
+
+  /* detail table */
+  const desc=[...recs].reverse();
+  document.querySelector("#tblDetail tbody").innerHTML=desc.map((r,i)=>{
+    const isC=clusterSet.has(dayKey(r.dt));
+    return `<tr class="${isC?"cluster":""}"><td class="mono dim">${desc.length-i}</td><td class="mono">${fmtDT(r.dt)}</td><td class="mono">${fmtDur(r.dur)}</td><td class="mono">${fmtDur(r.rec)}</td><td>${r.trig?`<span class="tag">${esc(r.trig)}</span>`:'<span class="dim">–</span>'}</td><td>${esc(r.type)||'<span class="dim">–</span>'}</td><td style="font-size:.76rem">${esc(r.note)}</td><td class="mono"><button class="rowbtn" onclick="editRec('${r.id}')">แก้ไข</button></td></tr>`;
+  }).join("");
+}
+
+/* ================= BOOT ================= */
+function boot(){
+  const has=DB.dogs.length>0;
+  document.getElementById("onboard").style.display=has?"none":"";
+  document.getElementById("app").style.display=has?"":"none";
+  if(has){Object.values(charts).forEach(c=>c.destroy());charts={};render()}
+}
+boot();
+let rzT;window.addEventListener("resize",()=>{clearTimeout(rzT);rzT=setTimeout(()=>{if(DB.dogs.length)refresh()},300)});
+document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)closeModals()}));
+</script>
+</body>
+</html>
