@@ -426,7 +426,7 @@ footer{font-size:.72rem;color:var(--sub);text-align:center;margin-top:8px;line-h
 
     <div id="syncAuthForm">
       <div class="secttl">🔑 เข้าสู่ระบบ (บัญชีจากผู้พัฒนา)</div>
-      <div class="frow"><label>ชื่อผู้ใช้ (หรืออีเมล)</label><input type="text" id="syEmail" placeholder="เช่น wee" autocapitalize="none"></div>
+      <div class="frow"><label>ชื่อผู้ใช้ (หรืออีเมล)</label><input type="text" id="syEmail" placeholder="เช่น username" autocapitalize="none"></div>
       <div class="frow"><label>รหัสผ่าน (อย่างน้อย 6 ตัว)</label><input type="password" id="syPass"></div>
       <div class="pactions">
         <a class="btn sec" href="https://github.com/vfullcycle/dog-seizure-tracker/issues" target="_blank" rel="noopener">✉️ ติดต่อขอเปิดใช้ Sync</a>
@@ -1116,11 +1116,31 @@ async function syncNow(silent){
     DB=mergeDB(DB,rebuildDB(dg.data||[],rc.data||[],tr.data||[]));
     saveDB();
     Object.values(charts).forEach(c=>c.destroy());charts={};boot();
-    const f=flattenDB(DB,user.id); /* owner_id จาก user ที่ยืนยันแล้ว · dogs ก่อน (foreign key) */
-    for(const [t,rows] of [["dogs",f.dogs],["records",f.records],["treatments",f.treatments]]){
-      if(rows.length){const {error}=await sb.from(t).upsert(rows);if(error)throw error}
+    /* id ฝั่งเราที่อยู่บน server แล้ว = ของบัญชีเราแน่นอน (RLS กรองให้เห็นแค่ของตัวเอง) */
+    const serverIds={dogs:new Set((dg.data||[]).map(r=>r.id)),records:new Set((rc.data||[]).map(r=>r.id)),treatments:new Set((tr.data||[]).map(r=>r.id))};
+    const pushAll=async()=>{ /* dogs ก่อน (foreign key) */
+      const f=flattenDB(DB,user.id);
+      for(const [t,rows] of [["dogs",f.dogs],["records",f.records],["treatments",f.treatments]]){
+        if(rows.length){const {error}=await sb.from(t).upsert(rows);if(error)return error}
+      }
+      return null;
+    };
+    let pErr=await pushAll(),healed=false;
+    if(pErr&&/row-level security/i.test(pErr.message||"")){
+      /* id ชนกับแถวของบัญชีอื่น (เช่น import backup ข้ามบัญชี) →
+         re-id เฉพาะรายการที่ยังไม่อยู่บน server ของเรา แล้ว retry ครั้งเดียว
+         (dog_id ของลูก remap อัตโนมัติเพราะ flatten อิงโครง nested) */
+      const now=Date.now();
+      DB.dogs.forEach(g=>{
+        if(!serverIds.dogs.has(g.id)){const o=g.id;g.id=uid();g.updatedAt=now;if(DB.activeDogId===o)DB.activeDogId=g.id}
+        (g.records||[]).forEach(r=>{if(!serverIds.records.has(r.id)){r.id=uid();r.updatedAt=now}});
+        (g.treatments||[]).forEach(t=>{if(!serverIds.treatments.has(t.id)){t.id=uid();t.updatedAt=now}});
+      });
+      saveDB();healed=true;
+      pErr=await pushAll();
     }
-    if(!silent)syncStatus(`✓ sync ล่าสุด ${fmtDT(new Date())}`);
+    if(pErr)throw pErr;
+    if(!silent)syncStatus(`✓ sync ล่าสุด ${fmtDT(new Date())}`+(healed?" (ตั้งรหัสรายการนำเข้าใหม่อัตโนมัติ กันชนกับบัญชีอื่น)":""));
     syncBusy=false;return true;
   }catch(e){if(!silent)syncStatus("✕ sync ไม่สำเร็จ: "+(e.message||e),true);syncBusy=false;return false}
 }
