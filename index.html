@@ -186,6 +186,10 @@ footer{font-size:.72rem;color:var(--sub);text-align:center;margin-top:8px;line-h
       <button class="btn sec" onclick="loadDemo()">ดูตัวอย่างด้วยข้อมูลสมมติ</button>
       <button class="btn pri" onclick="obCreate()">เริ่มใช้งาน</button>
     </div>
+    <div class="hint" style="text-align:center;margin:12px 0 6px" id="obOr" hidden>— หรือ —</div>
+    <div class="pactions" style="justify-content:center" id="obLoginWrap" hidden>
+      <button class="btn sec" onclick="openSyncModal()">🔑 เคยใช้บริการ Sync? เข้าสู่ระบบเพื่อดึงข้อมูลเดิม</button>
+    </div>
     <div class="disclaimer">⚠ เครื่องมือนี้ช่วยจดบันทึกและสรุปข้อมูลเท่านั้น ไม่ใช่เครื่องมือวินิจฉัยและไม่ทดแทนคำแนะนำของสัตวแพทย์ หากสุนัขชักนานเกิน 5 นาที หรือชักซ้ำหลายครั้งในวันเดียว ให้พาไปพบสัตวแพทย์ทันที</div>
   </div>
 </div>
@@ -422,7 +426,7 @@ footer{font-size:.72rem;color:var(--sub);text-align:center;margin-top:8px;line-h
 
     <div id="syncAuthForm">
       <div class="secttl">🔑 เข้าสู่ระบบ (บัญชีจากผู้พัฒนา)</div>
-      <div class="frow"><label>อีเมล</label><input type="email" id="syEmail" placeholder="you@example.com"></div>
+      <div class="frow"><label>ชื่อผู้ใช้ (หรืออีเมล)</label><input type="text" id="syEmail" placeholder="เช่น wee" autocapitalize="none"></div>
       <div class="frow"><label>รหัสผ่าน (อย่างน้อย 6 ตัว)</label><input type="password" id="syPass"></div>
       <div class="pactions">
         <a class="btn sec" href="https://github.com/vfullcycle/dog-seizure-tracker/issues" target="_blank" rel="noopener">✉️ ติดต่อขอเปิดใช้ Sync</a>
@@ -1147,16 +1151,21 @@ function openSyncModal(){document.getElementById("syncModal").classList.add("ope
 function updateSyncUI(session){
   document.getElementById("syncAuthForm").style.display=session?"none":"";
   document.getElementById("syncLoggedIn").style.display=session?"":"none";
-  if(session)document.getElementById("syWho").textContent=session.user.email;
+  if(session)document.getElementById("syWho").textContent=session.user.email.replace(USER_SUFFIX,"");
 }
+const USER_SUFFIX="@user.vbase.app"; /* username → อีเมลสังเคราะห์ (ผู้พัฒนาสร้างบัญชีรูปแบบเดียวกันใน dashboard) */
 async function doSignIn(){
-  const email=syEmail.value.trim(),password=syPass.value;
+  const id=syEmail.value.trim(),password=syPass.value;
+  if(!id||!password){syncStatus("กรอกชื่อผู้ใช้และรหัสผ่าน",true);return}
+  const email=id.includes("@")?id:id.toLowerCase()+USER_SUFFIX;
   const {error}=await sb.auth.signInWithPassword({email,password});
-  if(error)syncStatus("✕ "+error.message,true);
+  if(error)syncStatus("✕ "+(error.message==="Invalid login credentials"?"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง":error.message),true);
 }
 async function doSignOut(){await sb.auth.signOut();syncStatus("ออกจากระบบแล้ว — ข้อมูลในเครื่องยังอยู่ครบ")}
 
 if(sb){
+  document.getElementById("obOr").hidden=false;
+  document.getElementById("obLoginWrap").hidden=false;
   sb.auth.onAuthStateChange((ev,session)=>{
     loggedIn=!!session;
     updateSyncUI(session);
