@@ -6,6 +6,7 @@
 <title>Dog Seizure Tracker — บันทึกอาการชักสุนัข</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --paper:#F4F7F6; --card:#FFFFFF; --ink:#16302B; --sub:#5C7570;
@@ -122,6 +123,14 @@ tr.cluster td{background:#FDF6F5}
 .ttag.weight{background:#EEF1F0;color:var(--sub)}
 .ttag.blood{background:var(--red-soft);color:var(--red)}
 .printonly{display:none}
+.syncinfo{margin-bottom:14px}
+.syncinfo .ii{border-radius:10px;padding:9px 12px;font-size:.78rem;margin-bottom:6px;line-height:1.5}
+.syncinfo .ii b{display:block;margin-bottom:2px}
+.syncinfo .ii.warn{background:var(--amber-soft);border:1px solid #EAD3A0}
+.syncinfo .ii.teal{background:var(--teal-soft);border:1px solid #BEDCDA}
+.syncinfo .ii.sub2{background:#F1F4F3;color:var(--sub);font-size:.74rem}
+.secttl{font-size:.82rem;font-weight:600;color:var(--ink);margin:4px 0 6px}
+#tbMsg.ok{color:var(--teal)} #tbMsg.pending{color:var(--amber)} #tbMsg.bad{color:var(--red)}
 
 /* ONBOARDING */
 #onboard .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px;max-width:560px;margin:4vh auto}
@@ -208,12 +217,10 @@ footer{font-size:.72rem;color:var(--sub);text-align:center;margin-top:8px;line-h
 <div class="toolbar">
   <button class="btn pri" onclick="openRecModal()">＋ บันทึกการชัก</button>
   <button class="btn sec sm" onclick="openTreatModal()">＋ การรักษา/น้ำหนัก</button>
-  <button class="btn sec sm" onclick="exportJSON()">สำรองข้อมูล</button>
-  <button class="btn sec sm" onclick="document.getElementById('importFile').click()">นำเข้า</button>
+  <button class="btn sec sm" onclick="openSyncModal()">☁ Sync</button>
+  <button class="btn sec sm" onclick="window.print()">🖨️ พิมพ์รายงาน</button>
+  <a class="btn sec sm" href="https://github.com/vfullcycle/dog-seizure-tracker/issues" target="_blank" rel="noopener">🛠️ รายงานปัญหา / 💡 ข้อเสนอแนะ</a>
   <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
-  <button class="btn sec sm" onclick="exportCSV()">CSV</button>
-  <button class="btn sec sm" onclick="window.print()">พิมพ์สรุป</button>
-  <a class="btn sec sm" href="https://github.com/vfullcycle/dog-seizure-tracker/issues" target="_blank" rel="noopener">รายงานปัญหา / ข้อเสนอแนะ</a>
   <span id="tbMsg"></span>
   <div class="filterbar">
     <button class="chip on" onclick="setPreset('all',this)">ทั้งหมด</button>
@@ -312,9 +319,9 @@ footer{font-size:.72rem;color:var(--sub);text-align:center;margin-top:8px;line-h
 </div>
 
 <footer>
-  ข้อมูลทั้งหมดเก็บในเครื่องนี้เท่านั้น — แนะนำกด "สำรองข้อมูล" เป็นระยะ เพราะการล้างข้อมูล browser จะลบบันทึกทั้งหมด<br>
+  ข้อมูลทั้งหมดเก็บในเครื่องนี้เท่านั้น — แนะนำกด "Export" ในกล่อง Sync เป็นระยะ หรือเข้าสู่ระบบเพื่อ Sync อัตโนมัติ เพราะการล้างข้อมูล browser จะลบบันทึกทั้งหมด<br>
   ⚠ เครื่องมือช่วยจดบันทึก ไม่ทดแทนคำวินิจฉัยของสัตวแพทย์ · ชักนาน ≥5 นาที หรือชักซ้ำหลายครั้งในวันเดียว ให้พบสัตวแพทย์ทันที<br>
-  Dog Seizure Tracker v3.1 · พัฒนาโดย ร้อยเอก ทวีพล รอดปรีชา ร่วมกับ Claude (Anthropic) · แจกฟรี ห้ามจำหน่าย (CC BY-NC 4.0)<br>
+  Dog Seizure Tracker v4.1 · พัฒนาโดย ร้อยเอก ทวีพล รอดปรีชา ร่วมกับ Claude (Anthropic) · แจกฟรี ห้ามจำหน่าย (CC BY-NC 4.0)<br>
   โค้ดเปิด + แจ้งปัญหาได้ที่ https://github.com/vfullcycle/dog-seizure-tracker
 </footer>
 </div><!-- /app -->
@@ -399,6 +406,51 @@ footer{font-size:.72rem;color:var(--sub);text-align:center;margin-top:8px;line-h
   </div>
 </div>
 
+<!-- SYNC MODAL (v4.1) -->
+<div class="overlay" id="syncModal">
+  <div class="panel">
+    <h3>☁ Sync &amp; ข้อมูล</h3>
+
+    <div class="syncinfo">
+      <div class="ii warn"><b>ตอนนี้ข้อมูลอยู่ในเครื่องนี้เท่านั้น (ฟรี)</b>ถ้าเครื่องพัง ทำเครื่องหาย หรือล้างข้อมูล browser บันทึกทั้งหมดจะหายไป กู้คืนไม่ได้ หากต้องการเปลี่ยนเครื่องให้สำรองข้อมูลที่ด้านล่าง</div>
+      <div class="ii teal"><b>เข้าสู่ระบบเพื่อ Sync แล้วได้อะไร (ติดต่อผู้พัฒนา)</b>
+        <span>• ใช้ข้อมูลชุดเดียวกันได้ทุกเครื่อง — บันทึกที่มือถือ เปิดดูที่คอม<br>
+        • ข้อมูลปลอดภัยแม้เครื่องพัง เพราะมีสำเนาบนบัญชีส่วนตัวของคุณ<br>
+        • ข้อมูลเข้ารหัสระหว่างส่ง และมองเห็นได้เฉพาะบัญชีคุณเท่านั้น</span></div>
+      <div class="ii sub2">อนาคตจะมีฟีเจอร์เพิ่มเติมสำหรับสมาชิก — ตอนนี้ทุกอย่างใช้ฟรี ไม่มีค่าใช้จ่าย</div>
+    </div>
+
+    <div id="syncAuthForm">
+      <div class="secttl">🔑 เข้าสู่ระบบ (บัญชีจากผู้พัฒนา)</div>
+      <div class="frow"><label>อีเมล</label><input type="email" id="syEmail" placeholder="you@example.com"></div>
+      <div class="frow"><label>รหัสผ่าน (อย่างน้อย 6 ตัว)</label><input type="password" id="syPass"></div>
+      <div class="pactions">
+        <a class="btn sec" href="https://github.com/vfullcycle/dog-seizure-tracker/issues" target="_blank" rel="noopener">✉️ ติดต่อขอเปิดใช้ Sync</a>
+        <button class="btn pri" onclick="doSignIn()">🔑 Login</button>
+      </div>
+    </div>
+
+    <div id="syncLoggedIn" style="display:none">
+      <div class="frow"><label>เข้าสู่ระบบแล้ว</label><div id="syWho" style="font-size:.86rem;font-weight:600"></div></div>
+      <div class="pactions">
+        <button class="btn sec" onclick="doSignOut()">ออกจากระบบ</button>
+        <button class="btn pri" onclick="syncNow()">☁ Sync เดี๋ยวนี้</button>
+      </div>
+    </div>
+
+    <div class="hint" id="syncStatus" style="margin-top:8px"></div>
+
+    <div class="secttl" style="margin-top:14px">ไฟล์สำรอง</div>
+    <div class="hint" style="margin-bottom:6px">ส่งออกเก็บไฟล์เอง หรือย้ายเข้าเครื่องใหม่โดยไม่ต้องเข้าสู่ระบบก็ได้</div>
+    <div class="pactions" style="justify-content:flex-start">
+      <button class="btn sec sm" onclick="exportJSON()">⬆️ Export (ส่งออก)</button>
+      <button class="btn sec sm" onclick="document.getElementById('importFile').click()">⬇️ Import (นำเข้า)</button>
+    </div>
+
+    <div class="pactions"><button class="btn sec sm" onclick="closeModals()">ปิด</button></div>
+  </div>
+</div>
+
 </div><!-- /wrap -->
 
 <script>
@@ -409,9 +461,15 @@ const KEY="dogSeizureTracker.v2"; /* คง key เดิม — ข้อมู
 let memFallback=null;
 function normalizeDB(d){ /* migration v2 → v3: เพิ่ม treatments ให้ทุกตัว */
   d.version=3;
+  d.version=4;
   d.dogs.forEach(g=>{
     if(!Array.isArray(g.treatments))g.treatments=[];
     g.treatments.forEach(t=>{if(Array.isArray(t.meds))t.meds=t.meds.map(normMed)});
+    /* v4: id ต้องเป็น uuid สำหรับ sync + ทุก entity มี updatedAt/deleted */
+    if(!isUuid(g.id)){const old=g.id;g.id=uid();if(d.activeDogId===old)d.activeDogId=g.id}
+    g.updatedAt??=Date.now();g.deleted??=false;
+    (g.records||[]).forEach(r=>{if(!isUuid(r.id))r.id=uid();r.updatedAt??=Date.now();r.deleted??=false});
+    g.treatments.forEach(t=>{if(!isUuid(t.id))t.id=uid();t.updatedAt??=Date.now();t.deleted??=false});
   });
   return d;
 }
@@ -424,8 +482,10 @@ function saveDB(){
   try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}
 }
 let DB=loadDB();
-const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-const activeDog=()=>DB.dogs.find(d=>d.id===DB.activeDogId)||DB.dogs[0]||null;
+const uid=()=>(globalThis.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const isUuid=s=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||"");
+const liveDogs=()=>DB.dogs.filter(d=>!d.deleted);
+const activeDog=()=>{const L=liveDogs();return L.find(d=>d.id===DB.activeDogId)||L[0]||null};
 
 /* ================= HELPERS ================= */
 const THM=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
@@ -488,7 +548,7 @@ function setCustomRange(){
 let editingDog=false;
 function refreshDogSelect(){
   const sel=document.getElementById("dogSelect");
-  sel.innerHTML=DB.dogs.map(d=>`<option value="${d.id}" ${d.id===DB.activeDogId?"selected":""}>${esc(d.name)}</option>`).join("");
+  sel.innerHTML=liveDogs().map(d=>`<option value="${d.id}" ${d.id===DB.activeDogId?"selected":""}>${esc(d.name)}</option>`).join("");
 }
 function switchDog(id){DB.activeDogId=id;saveDB();F={from:null,to:null};markChip(document.querySelector('.chip'));refresh()}
 function openDogModal(edit){
@@ -505,15 +565,15 @@ function saveDog(){
   const name=document.getElementById("dName").value.trim();
   if(!name){alert("กรุณาใส่ชื่อสุนัข");return}
   const breed=document.getElementById("dBreed").value.trim(),meds=document.getElementById("dMeds").value.trim();
-  if(editingDog){const d=activeDog();d.name=name;d.breed=breed;d.meds=meds}
-  else{const d={id:uid(),name,breed,meds,records:[],treatments:[]};DB.dogs.push(d);DB.activeDogId=d.id}
-  saveDB();closeModals();boot();
+  if(editingDog){const d=activeDog();d.name=name;d.breed=breed;d.meds=meds;d.updatedAt=Date.now()}
+  else{const d={id:uid(),name,breed,meds,records:[],treatments:[],updatedAt:Date.now(),deleted:false};DB.dogs.push(d);DB.activeDogId=d.id}
+  closeModals();boot();afterSave();
 }
 function deleteDog(){
   const d=activeDog();
-  if(!confirm(`ลบโปรไฟล์ "${d.name}" และบันทึกทั้งหมด ${d.records.length} รายการ? การลบย้อนกลับไม่ได้`))return;
-  DB.dogs=DB.dogs.filter(x=>x.id!==d.id);
-  DB.activeDogId=DB.dogs[0]?.id||null;
+  if(!confirm(`ลบโปรไฟล์ "${d.name}" และบันทึกทั้งหมด ${d.records.filter(r=>!r.deleted).length} รายการ? การลบย้อนกลับไม่ได้`))return;
+  d.deleted=true;d.updatedAt=Date.now();
+  DB.activeDogId=liveDogs()[0]?.id||null;
   saveDB();closeModals();boot();
 }
 
@@ -554,16 +614,18 @@ function saveRec(){
     type:document.getElementById("rType").value.trim(),
     note:document.getElementById("rNote").value.trim()
   };
+  item.updatedAt=Date.now();item.deleted=false;
   const d=activeDog();
   if(editingRecId){const i=d.records.findIndex(r=>r.id===editingRecId);d.records[i]=item}
   else d.records.push(item);
-  saveDB();closeModals();refresh();toast(editingRecId?"✓ แก้ไขแล้ว":"✓ บันทึกแล้ว");
+  closeModals();refresh();afterSave();
 }
 function deleteRec(){
   if(!confirm("ลบบันทึกนี้?"))return;
   const d=activeDog();
-  d.records=d.records.filter(r=>r.id!==editingRecId);
-  saveDB();closeModals();refresh();toast("✓ ลบแล้ว");
+  const r=d.records.find(x=>x.id===editingRecId);
+  if(r){r.deleted=true;r.updatedAt=Date.now()}
+  closeModals();refresh();afterSave();
 }
 function editRec(id){const r=activeDog().records.find(x=>x.id===id);if(r)openRecModal(r)}
 function closeModals(){document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("open"))}
@@ -591,9 +653,9 @@ function importJSON(input){
   rd.readAsText(f);input.value="";
 }
 function exportCSV(){
-  const d=activeDog();if(!d||!d.records.length){toast("ยังไม่มีข้อมูลให้ export",false);return}
+  const d=activeDog();if(!d||!d.records.some(r=>!r.deleted)){toast("ยังไม่มีข้อมูลให้ export",false);return}
   const rows=[["วันและเวลาที่ชัก","ชักนาน (วินาที)","ฟื้นตัว (วินาที)","สิ่งกระตุ้น","ลักษณะการชัก","หมายเหตุ"]];
-  [...d.records].sort((a,b)=>a.dt.localeCompare(b.dt)).forEach(r=>rows.push([r.dt.replace("T"," "),r.dur,r.rec??"",r.trig,r.type,r.note]));
+  d.records.filter(r=>!r.deleted).sort((a,b)=>a.dt.localeCompare(b.dt)).forEach(r=>rows.push([r.dt.replace("T"," "),r.dur,r.rec??"",r.trig,r.type,r.note]));
   const csv="\uFEFF"+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
@@ -675,7 +737,7 @@ function setMedView(v){
 
 const TTYPE={vet:"พบสัตวแพทย์",med:"ปรับยา",weight:"ชั่งน้ำหนัก",blood:"ตรวจเลือด"};
 let editingTreatId=null;
-const treatSorted=d=>[...(d.treatments||[])].sort((a,b)=>a.date.localeCompare(b.date));
+const treatSorted=d=>(d.treatments||[]).filter(t=>!t.deleted).sort((a,b)=>a.date.localeCompare(b.date));
 function latestMeds(d){ /* snapshot ล่าสุด */
   const t=treatSorted(d).filter(t=>t.meds&&t.meds.length);
   return t.length?t[t.length-1]:null;
@@ -740,16 +802,18 @@ function saveTreat(){
     advice:document.getElementById("tAdvice").value.trim(),
     meds:document.getElementById("tHasMeds").checked?readMedRows():[]
   };
+  item.updatedAt=Date.now();item.deleted=false;
   const d=activeDog();
   if(editingTreatId){const i=d.treatments.findIndex(t=>t.id===editingTreatId);d.treatments[i]=item}
   else (d.treatments??=[]).push(item);
-  saveDB();closeModals();refresh();toast(editingTreatId?"✓ แก้ไขแล้ว":"✓ บันทึกการรักษาแล้ว");
+  closeModals();refresh();afterSave();
 }
 function deleteTreat(){
   if(!confirm("ลบบันทึกการรักษานี้?"))return;
   const d=activeDog();
-  d.treatments=d.treatments.filter(t=>t.id!==editingTreatId);
-  saveDB();closeModals();refresh();toast("✓ ลบแล้ว");
+  const t=d.treatments.find(x=>x.id===editingTreatId);
+  if(t){t.deleted=true;t.updatedAt=Date.now()}
+  closeModals();refresh();afterSave();
 }
 function editTreat(id){const t=activeDog().treatments.find(x=>x.id===id);if(t)openTreatModal(t)}
 
@@ -837,7 +901,7 @@ function render(){
   const dog=activeDog();if(!dog)return;
   document.getElementById("dogTitle").textContent=dog.name;
   refreshDogSelect();
-  const hasData=dog.records.length>0;
+  const hasData=dog.records.some(r=>!r.deleted);
   document.getElementById("chartsArea").style.display=hasData?"":"none";
   document.getElementById("emptyState").style.display=hasData?"none":"";
   document.querySelector(".hero").style.display=hasData?"":"none";
@@ -846,7 +910,7 @@ function render(){
   renderTreatments(dog); /* v3: การรักษาแสดงเสมอ ไม่ผูกกับบันทึกชัก */
   if(!hasData){document.getElementById("emptyDogName").textContent=dog.name;return}
 
-  const all=dog.records.map(r=>({...r,dt:new Date(r.dt)})).sort((a,b)=>a.dt-b.dt);
+  const all=dog.records.filter(r=>!r.deleted).map(r=>({...r,dt:new Date(r.dt)})).sort((a,b)=>a.dt-b.dt);
   const now=new Date();
   const lastAll=all[all.length-1].dt;
 
@@ -982,9 +1046,128 @@ function render(){
   }).join("");
 }
 
+
+/* ================= SYNC LAYER (v4) ================= */
+const SB_URL="https://meafvzhvcxmeexrtawls.supabase.co";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lYWZ2emh2Y3htZWV4cnRhd2xzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzMjEzNTAsImV4cCI6MjA5ODg5NzM1MH0.5pFGvSP1ov8LGkiGk-2NVOXztmvAzmohsNNPHewW5A0"; /* ← anon public key (Settings → API) */
+let sb=null;
+try{if(window.supabase&&SB_KEY.length>40)sb=window.supabase.createClient(SB_URL,SB_KEY)}catch(e){}
+
+const isoToLocal=iso=>{const d=new Date(iso);return `${dayKey(d)}T${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
+
+function flattenDB(db,ownerId){
+  const dogs=[],records=[],treatments=[];
+  const oi=ownerId?{owner_id:ownerId}:{};
+  db.dogs.forEach(g=>{
+    dogs.push({id:g.id,...oi,name:g.name,breed:g.breed||"",meds:g.meds||"",deleted:!!g.deleted,updated_at:new Date(g.updatedAt||0).toISOString()});
+    (g.records||[]).forEach(r=>records.push({id:r.id,dog_id:g.id,...oi,dt:new Date(r.dt).toISOString(),dur:r.dur,rec:r.rec??null,trig:r.trig||"",type:r.type||"",note:r.note||"",deleted:!!r.deleted,updated_at:new Date(r.updatedAt||0).toISOString()}));
+    (g.treatments||[]).forEach(t=>treatments.push({id:t.id,dog_id:g.id,...oi,date:t.date,type:t.type,weight:t.weight??null,advice:t.advice||"",meds:t.meds||[],deleted:!!t.deleted,updated_at:new Date(t.updatedAt||0).toISOString()}));
+  });
+  return {dogs,records,treatments};
+}
+function rebuildDB(dogs,records,treatments){
+  const map={};
+  dogs.forEach(g=>map[g.id]={id:g.id,name:g.name,breed:g.breed,meds:g.meds,deleted:!!g.deleted,updatedAt:+new Date(g.updated_at),records:[],treatments:[]});
+  records.forEach(r=>{const g=map[r.dog_id];if(!g)return;
+    g.records.push({id:r.id,dt:isoToLocal(r.dt),dur:r.dur,rec:r.rec,trig:r.trig,type:r.type,note:r.note,deleted:!!r.deleted,updatedAt:+new Date(r.updated_at)})});
+  treatments.forEach(t=>{const g=map[t.dog_id];if(!g)return;
+    g.treatments.push({id:t.id,date:t.date,type:t.type,weight:t.weight==null?null:+t.weight,advice:t.advice,meds:t.meds||[],deleted:!!t.deleted,updatedAt:+new Date(t.updated_at)})});
+  return {version:4,dogs:Object.values(map),activeDogId:null};
+}
+/* กฎ merge ข้อเดียว: id เดียวกัน updatedAt ใหม่กว่าชนะ (LWW) */
+function mergeDB(local,server){
+  const pick=(a,b)=>((a.updatedAt||0)>=(b.updatedAt||0)?a:b);
+  const mergeKids=(A=[],B=[])=>{const m={};A.forEach(x=>m[x.id]=x);B.forEach(x=>{m[x.id]=m[x.id]?pick(m[x.id],x):x});return Object.values(m)};
+  const byId={};local.dogs.forEach(g=>byId[g.id]=g);
+  server.dogs.forEach(s=>{
+    const l=byId[s.id];
+    if(!l){byId[s.id]=s;return}
+    const win=pick(l,s);
+    byId[s.id]={...win,records:mergeKids(l.records,s.records),treatments:mergeKids(l.treatments,s.treatments)};
+  });
+  const dogs=Object.values(byId);
+  let act=local.activeDogId;
+  if(!dogs.find(d=>d.id===act&&!d.deleted))act=(dogs.find(d=>!d.deleted)||{}).id||null;
+  return {version:4,dogs,activeDogId:act};
+}
+
+let syncBusy=false, loggedIn=false, pendingSync=false;
+function syncStatus(t,bad){const el=document.getElementById("syncStatus");if(el){el.textContent=t;el.style.color=bad?"var(--red)":"var(--sub)"}}
+/* แถบสถานะบน toolbar (DF2) — 3 สถานะ */
+function tbStatus(t,cls){const m=document.getElementById("tbMsg");if(!m)return;m.textContent=t;m.className=cls||"";if(cls==="ok")setTimeout(()=>{if(m.textContent===t)m.textContent="",m.className=""},4000)}
+
+async function syncNow(silent){
+  if(!sb||syncBusy)return true;
+  syncBusy=true;
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session){if(!silent)syncStatus("ยังไม่ได้เข้าสู่ระบบ",true);syncBusy=false;return false}
+    /* กัน race: session เพิ่งออกตอนสมัคร/login อาจยังไม่ propagate ไปถึงชั้น query
+       ยืนยันด้วย getUser() (คุยกับ server จริง) ก่อน push ไม่งั้น INSERT โดน RLS ปฏิเสธ */
+    const {data:{user},error:uErr}=await sb.auth.getUser();
+    if(uErr||!user){if(!silent)syncStatus("กำลังเตรียมบัญชี… ลองอีกครั้งใน 1-2 วินาที",true);syncBusy=false;return false}
+    if(!silent)syncStatus("กำลัง sync…");
+    const [dg,rc,tr]=await Promise.all([sb.from("dogs").select("*"),sb.from("records").select("*"),sb.from("treatments").select("*")]);
+    const err=dg.error||rc.error||tr.error;if(err)throw err;
+    DB=mergeDB(DB,rebuildDB(dg.data||[],rc.data||[],tr.data||[]));
+    saveDB();
+    Object.values(charts).forEach(c=>c.destroy());charts={};boot();
+    const f=flattenDB(DB,user.id); /* owner_id จาก user ที่ยืนยันแล้ว · dogs ก่อน (foreign key) */
+    for(const [t,rows] of [["dogs",f.dogs],["records",f.records],["treatments",f.treatments]]){
+      if(rows.length){const {error}=await sb.from(t).upsert(rows);if(error)throw error}
+    }
+    if(!silent)syncStatus(`✓ sync ล่าสุด ${fmtDT(new Date())}`);
+    syncBusy=false;return true;
+  }catch(e){if(!silent)syncStatus("✕ sync ไม่สำเร็จ: "+(e.message||e),true);syncBusy=false;return false}
+}
+
+/* DF2: บันทึกเสร็จ → ผู้ใช้แค่รอ ระบบบอกสถานะเอง ไม่ต้องกดซ้ำ */
+let syncT;
+function afterSave(){
+  saveDB();
+  if(!sb||!loggedIn){tbStatus("✓ บันทึกแล้ว","ok");return} /* ไม่ login = local สำเร็จทันที ไม่มี cloud ให้รอ */
+  tbStatus("⏳ กำลังบันทึกข้อมูล…","pending");
+  pendingSync=true;
+  clearTimeout(syncT);
+  syncT=setTimeout(async()=>{
+    const ok=await syncNow(true);
+    pendingSync=false;
+    tbStatus(ok?"✓ บันทึกสำเร็จ":"⚠ บันทึกในเครื่องแล้ว แต่ sync คลาวด์ไม่สำเร็จ — จะลองใหม่เมื่อบันทึกครั้งต่อไป",ok?"ok":"bad");
+  },1200);
+}
+const scheduleSync=afterSave; /* alias: จุดเรียกเดิมทั้งหมดใช้ afterSave */
+
+/* กันปิดหน้าก่อน sync ทัน: flush คิวที่ค้าง (best-effort) */
+window.addEventListener("beforeunload",e=>{
+  if(pendingSync&&sb&&loggedIn){clearTimeout(syncT);syncNow(true);e.preventDefault();e.returnValue=""}
+});
+
+/* ---- Auth UI ---- */
+function openSyncModal(){document.getElementById("syncModal").classList.add("open")}
+function updateSyncUI(session){
+  document.getElementById("syncAuthForm").style.display=session?"none":"";
+  document.getElementById("syncLoggedIn").style.display=session?"":"none";
+  if(session)document.getElementById("syWho").textContent=session.user.email;
+}
+async function doSignIn(){
+  const email=syEmail.value.trim(),password=syPass.value;
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  if(error)syncStatus("✕ "+error.message,true);
+}
+async function doSignOut(){await sb.auth.signOut();syncStatus("ออกจากระบบแล้ว — ข้อมูลในเครื่องยังอยู่ครบ")}
+
+if(sb){
+  sb.auth.onAuthStateChange((ev,session)=>{
+    loggedIn=!!session;
+    updateSyncUI(session);
+    if(ev==="SIGNED_IN")syncNow(false);
+  });
+  sb.auth.getSession().then(({data:{session}})=>{loggedIn=!!session;updateSyncUI(session)});
+}
+
 /* ================= BOOT ================= */
 function boot(){
-  const has=DB.dogs.length>0;
+  const has=liveDogs().length>0;
   document.getElementById("onboard").style.display=has?"none":"";
   document.getElementById("app").style.display=has?"":"none";
   if(has){Object.values(charts).forEach(c=>c.destroy());charts={};render()}
