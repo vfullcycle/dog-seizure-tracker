@@ -17,9 +17,10 @@ jobs:
           SUPABASE_URL: https://meafvzhvcxmeexrtawls.supabase.co
           SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lYWZ2emh2Y3htZWV4cnRhd2xzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzMjEzNTAsImV4cCI6MjA5ODg5NzM1MH0.5pFGvSP1ov8LGkiGk-2NVOXztmvAzmohsNNPHewW5A0
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          STATUS=$(curl -s -I -o /dev/null -w "%{http_code}" \
             -H "apikey: ${SUPABASE_ANON_KEY}" \
-            "${SUPABASE_URL}/rest/v1/")
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            "${SUPABASE_URL}/rest/v1/dogs?select=id&limit=1")
           echo "HTTP status: $STATUS"
           if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
             echo "::error::Supabase ping failed with HTTP status $STATUS"
