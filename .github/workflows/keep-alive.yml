@@ -1,0 +1,27 @@
+name: Supabase Keep-Alive
+
+# Supabase free tier พัก (pause) โปรเจกต์อัตโนมัติหลังไม่มี API request เข้ามา 7 วัน
+# workflow นี้ยิง request เบาๆ ไปที่ PostgREST ทุกวันเพื่อกันโปรเจกต์หลับ
+on:
+  schedule:
+    - cron: "0 3 * * *" # 10:00 Asia/Bangkok ทุกวัน (UTC+7)
+  workflow_dispatch: {}
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST endpoint
+        env:
+          # anon public key — ตัวเดียวกับที่ฝังใน index.html (SB_KEY), ปลอดภัยเพราะข้อมูลจริงป้องกันด้วย RLS ทุกตาราง
+          SUPABASE_URL: https://meafvzhvcxmeexrtawls.supabase.co
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lYWZ2emh2Y3htZWV4cnRhd2xzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzMjEzNTAsImV4cCI6MjA5ODg5NzM1MH0.5pFGvSP1ov8LGkiGk-2NVOXztmvAzmohsNNPHewW5A0
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            "${SUPABASE_URL}/rest/v1/")
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "::error::Supabase ping failed with HTTP status $STATUS"
+            exit 1
+          fi
